@@ -3,15 +3,21 @@ package com.synccarreira.synccarreira_api.controllers;
 import com.synccarreira.synccarreira_api.dto.CustomError;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyStatusDTO;
+import com.synccarreira.synccarreira_api.dto.psychologist.ReportFile;
 import com.synccarreira.synccarreira_api.services.JourneyHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -80,5 +86,32 @@ public class JourneyHistoryController {
     )
     public ResponseEntity<JourneyStatusDTO> startNewJourney() {
         return ResponseEntity.ok(journeyHistoryService.startNewJourney());
+    }
+
+    @GetMapping("/{journeyId}/pdf")
+    @Operation(summary = "Baixa o PDF de uma jornada concluída do aluno logado, com perfil, perguntas e respostas, sínteses e resultado.")
+    @ApiResponse(
+            responseCode = "200",
+            description = "PDF gerado com sucesso.",
+            content = { @Content(mediaType = "application/pdf") }
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "Jornada concluída não encontrada para o aluno logado.",
+            content = { @Content(mediaType = "application/json", schema = @Schema(implementation = CustomError.class)) }
+    )
+    public ResponseEntity<byte[]> downloadMyJourneyPdf(
+            @Parameter(description = "Id da jornada concluída.", required = true)
+            @PathVariable Long journeyId
+    ) {
+        ReportFile file = journeyHistoryService.generateMyJourneyPdf(journeyId);
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(file.getFileName())
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(file.getContent().length)
+                .body(file.getContent());
     }
 }

@@ -1,8 +1,10 @@
 package com.synccarreira.synccarreira_api.services;
 
 import com.synccarreira.synccarreira_api.dto.journey.JourneyContent;
+import com.synccarreira.synccarreira_api.dto.journey.JourneyPdfData;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyStatusDTO;
+import com.synccarreira.synccarreira_api.dto.psychologist.ReportFile;
 import com.synccarreira.synccarreira_api.entities.Institution;
 import com.synccarreira.synccarreira_api.entities.JourneyRecord;
 import com.synccarreira.synccarreira_api.entities.Question;
@@ -20,6 +22,7 @@ import com.synccarreira.synccarreira_api.repositories.SynthesisRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
 import com.synccarreira.synccarreira_api.services.exceptions.BusinessException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
+import com.synccarreira.synccarreira_api.services.reports.JourneyPdfWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -49,6 +52,7 @@ public class JourneyHistoryService {
     private final InformationLinkRepository informationLinkRepository;
     private final AuthService authService;
     private final ObjectMapper objectMapper;
+    private final JourneyPdfWriter journeyPdfWriter;
 
     public JourneyHistoryService(
             final StudentRepository studentRepository,
@@ -58,7 +62,8 @@ public class JourneyHistoryService {
             final SynthesisRepository synthesisRepository,
             final InformationLinkRepository informationLinkRepository,
             final AuthService authService,
-            final ObjectMapper objectMapper) {
+            final ObjectMapper objectMapper,
+            final JourneyPdfWriter journeyPdfWriter) {
         this.studentRepository = studentRepository;
         this.journeyRecordRepository = journeyRecordRepository;
         this.trailRepository = trailRepository;
@@ -67,6 +72,7 @@ public class JourneyHistoryService {
         this.informationLinkRepository = informationLinkRepository;
         this.authService = authService;
         this.objectMapper = objectMapper;
+        this.journeyPdfWriter = journeyPdfWriter;
     }
 
     @Transactional(readOnly = true)
@@ -81,6 +87,27 @@ public class JourneyHistoryService {
     @Transactional(readOnly = true)
     public JourneyStatusDTO findMyCurrentJourney() {
         return status(loggedStudent());
+    }
+
+    // Só existem registros de jornadas concluídas, e a busca filtra pelo aluno do token
+    @Transactional(readOnly = true)
+    public ReportFile generateMyJourneyPdf(Long journeyId) {
+        Student student = loggedStudent();
+        JourneyRecord journey = journeyRecordRepository.findByIdAndStudentId(journeyId, student.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Jornada não encontrada. ID: " + journeyId));
+
+        JourneyContent content = objectMapper.readValue(journey.getContent(), JourneyContent.class);
+        JourneyPdfData data = new JourneyPdfData(
+                student.getName(),
+                student.getEmail(),
+                student.getScholarYear(),
+                toDTO(journey, student),
+                content);
+
+        // Ex.: minha-jornada-2-2026-10-11.pdf
+        String fileName = "minha-jornada-" + journey.getJourneyNumber() + "-"
+                + JourneyPdfWriter.formatFileDate(journey.getConcludedAt()) + ".pdf";
+        return new ReportFile(fileName, journeyPdfWriter.write(data));
     }
 
     // Chamado depois que o aluno envia uma síntese: se todas as trilhas têm síntese, a jornada atual foi concluída

@@ -1,8 +1,10 @@
 package com.synccarreira.synccarreira_api.services;
 
 import com.synccarreira.synccarreira_api.dto.journey.JourneyContent;
+import com.synccarreira.synccarreira_api.dto.journey.JourneyPdfData;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyStatusDTO;
+import com.synccarreira.synccarreira_api.dto.psychologist.ReportFile;
 import com.synccarreira.synccarreira_api.entities.Answer;
 import com.synccarreira.synccarreira_api.entities.InformationLink;
 import com.synccarreira.synccarreira_api.entities.Institution;
@@ -25,6 +27,7 @@ import com.synccarreira.synccarreira_api.repositories.SynthesisRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
 import com.synccarreira.synccarreira_api.services.exceptions.BusinessException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
+import com.synccarreira.synccarreira_api.services.reports.JourneyPdfWriter;
 import com.synccarreira.synccarreira_api.tests.JourneyFactory;
 import com.synccarreira.synccarreira_api.tests.StudentFactory;
 import org.junit.jupiter.api.Assertions;
@@ -70,6 +73,9 @@ public class JourneyHistoryServiceTests {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private JourneyPdfWriter journeyPdfWriter;
+
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     private JourneyHistoryService service;
@@ -82,7 +88,7 @@ public class JourneyHistoryServiceTests {
     @BeforeEach
     void setUp() {
         service = new JourneyHistoryService(studentRepository, journeyRecordRepository, trailRepository, answerRepository,
-                synthesisRepository, informationLinkRepository, authService, objectMapper);
+                synthesisRepository, informationLinkRepository, authService, objectMapper, journeyPdfWriter);
 
         // Scores: humanas 7.5, exatas 6.0, biológicas 8.25, artes 5.0 (maior: biológicas)
         student = StudentFactory.createStudentWithCompletedProfile();
@@ -278,6 +284,35 @@ public class JourneyHistoryServiceTests {
         Mockito.verify(answerRepository, Mockito.never()).deleteAllByStudentId(anyLong());
         Mockito.verify(synthesisRepository, Mockito.never()).deleteAllByStudentId(anyLong());
         Mockito.verify(studentRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void generateMyJourneyPdfShouldReturnPdfOfConcludedJourney() {
+        mockLoggedStudent();
+        String content = objectMapper.writeValueAsString(JourneyFactory.createJourneyContent());
+        JourneyRecord journey = JourneyFactory.createJourneyRecord(student, 1, content);
+        Mockito.when(journeyRecordRepository.findByIdAndStudentId(1L, student.getId())).thenReturn(Optional.of(journey));
+        byte[] pdf = new byte[] { 1, 2, 3 };
+        Mockito.when(journeyPdfWriter.write(any())).thenReturn(pdf);
+
+        ReportFile result = service.generateMyJourneyPdf(1L);
+
+        Assertions.assertEquals("minha-jornada-1-2026-10-01.pdf", result.getFileName());
+        Assertions.assertArrayEquals(pdf, result.getContent());
+        ArgumentCaptor<JourneyPdfData> captor = ArgumentCaptor.forClass(JourneyPdfData.class);
+        Mockito.verify(journeyPdfWriter).write(captor.capture());
+        Assertions.assertEquals(student.getName(), captor.getValue().studentName());
+        Assertions.assertEquals(1, captor.getValue().journey().journeyNumber());
+        Assertions.assertEquals(JourneyFactory.SYNTHESIS, captor.getValue().content().trails().getFirst().synthesis());
+    }
+
+    @Test
+    void generateMyJourneyPdfShouldThrowResourceNotFoundExceptionWhenJourneyIsNotFromLoggedStudent() {
+        mockLoggedStudent();
+        Mockito.when(journeyRecordRepository.findByIdAndStudentId(99L, student.getId())).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> service.generateMyJourneyPdf(99L));
+        Mockito.verify(journeyPdfWriter, Mockito.never()).write(any());
     }
 
     @Test

@@ -1,13 +1,18 @@
 package com.synccarreira.synccarreira_api.controllers;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.synccarreira.synccarreira_api.dto.psychologist.ReportFile;
 import com.synccarreira.synccarreira_api.services.JourneyHistoryService;
 import com.synccarreira.synccarreira_api.services.exceptions.BusinessException;
+import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.tests.JourneyFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +69,28 @@ public class JourneyHistoryControllerTests {
 
         result.andExpect(status().isOk());
         result.andExpect(jsonPath("$.currentJourneyNumber").value(2));
+    }
+
+    @Test
+    void downloadMyJourneyPdfShouldReturnPdfFile() throws Exception {
+        byte[] pdf = new byte[] { 37, 80, 68, 70 };
+        when(service.generateMyJourneyPdf(1L)).thenReturn(new ReportFile("minha-jornada-1-2026-10-01.pdf", pdf));
+
+        ResultActions result = mockMvc.perform(get("/journeys/me/1/pdf"));
+
+        result.andExpect(status().isOk());
+        result.andExpect(content().contentType(MediaType.APPLICATION_PDF));
+        result.andExpect(header().string("Content-Disposition", containsString("minha-jornada-1-2026-10-01.pdf")));
+        result.andExpect(content().bytes(pdf));
+    }
+
+    @Test
+    void downloadMyJourneyPdfShouldReturnNotFoundWhenJourneyDoesNotExist() throws Exception {
+        when(service.generateMyJourneyPdf(99L)).thenThrow(new ResourceNotFoundException("Jornada não encontrada. ID: 99"));
+
+        ResultActions result = mockMvc.perform(get("/journeys/me/99/pdf"));
+
+        result.andExpect(status().isNotFound());
     }
 
     @Test
