@@ -36,4 +36,9 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
             "WHERE c.institution.id = :institutionId " +
             "GROUP BY s.id, q.trail.id")
     List<AnsweredQuestionsProjection> countAnsweredQuestionsByInstitution(@Param("institutionId") Long institutionId);
+
+    // Usado ao iniciar uma nova jornada (RF-15): as respostas da jornada anterior já estão guardadas em JourneyRecord
+    @Modifying
+    @Query("DELETE FROM Answer a WHERE a.student.id = :studentId")
+    int deleteAllByStudentId(@Param("studentId") Long studentId);
 }

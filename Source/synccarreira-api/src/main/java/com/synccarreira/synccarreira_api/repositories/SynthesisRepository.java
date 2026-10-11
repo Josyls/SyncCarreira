@@ -3,6 +3,7 @@ package com.synccarreira.synccarreira_api.repositories;
 import com.synccarreira.synccarreira_api.entities.Synthesis;
 import com.synccarreira.synccarreira_api.projections.SubmittedSynthesisProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,4 +32,9 @@ public interface SynthesisRepository extends JpaRepository<Synthesis, Long> {
             "WHERE st.determinedSchoolClass.id = :schoolClassId " +
             "ORDER BY st.name, t.sequentialOrder")
     List<Synthesis> findBySchoolClassId(@Param("schoolClassId") Long schoolClassId);
+
+    // Usado ao iniciar uma nova jornada (RF-15): as sínteses da jornada anterior já estão guardadas em JourneyRecord
+    @Modifying
+    @Query("DELETE FROM Synthesis s WHERE s.student.id = :studentId")
+    int deleteAllByStudentId(@Param("studentId") Long studentId);
 }

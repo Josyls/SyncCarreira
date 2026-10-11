@@ -95,6 +95,15 @@ public class Student extends User {
     @Getter @Setter
     private Instant profileCompletedAt;
 
+    // Jornada em andamento (RF-15). As concluídas ficam guardadas em JourneyRecord.
+    @Column(name = "numero_jornada_atual", nullable = false)
+    @Getter @Setter
+    private Integer currentJourneyNumber = 1;
+
+    @Column(name = "data_inicio_jornada_atual")
+    @Getter @Setter
+    private Instant currentJourneyStartedAt;
+
     public boolean hasCompletedProfile() {
         return humanitiesAffinity != null
                 && exactSciencesAffinity != null
