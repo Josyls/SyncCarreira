@@ -45,6 +45,7 @@ public class ResourceServerConfig {
 	private static final String SYNTHESES = "/syntheses/**";
 	private static final String JOURNEY = "/journey/**";
 	private static final String JOURNEY_HISTORY = "/journeys/**";
+	private static final String FEEDBACKS = "/feedbacks/**";
 	private static final String QUESTIONS = "/questions/**";
 	private static final String ADMIN = "ADMIN";
 	private static final String USER = "USER";
@@ -120,7 +121,14 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.POST, JOURNEY).hasRole(USER)
 				// Histórico de jornadas (RF-15): só o próprio aluno acessa, a psicóloga não
 				.requestMatchers(HttpMethod.GET, JOURNEY_HISTORY).hasRole(USER)
-				.requestMatchers(HttpMethod.POST, JOURNEY_HISTORY).hasRole(USER));
+				.requestMatchers(HttpMethod.POST, JOURNEY_HISTORY).hasRole(USER)
+				// Feedbacks (RF-09/RF-16): a psicóloga envia e apaga; o aluno lê os seus
+				.requestMatchers(HttpMethod.GET, "/feedbacks/me").hasRole(USER)
+				.requestMatchers(HttpMethod.PATCH, "/feedbacks/*/read").hasRole(USER)
+				.requestMatchers(HttpMethod.GET, "/feedbacks/sent").hasRole(PSYCHOLOGIST)
+				.requestMatchers(HttpMethod.GET, "/feedbacks/panel/**").hasAnyRole(PSYCHOLOGIST, ADMIN)
+				.requestMatchers(HttpMethod.POST, FEEDBACKS).hasRole(PSYCHOLOGIST)
+				.requestMatchers(HttpMethod.DELETE, FEEDBACKS).hasRole(PSYCHOLOGIST));
 		http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(Customizer.withDefaults()));
 		http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
 		return http.build();

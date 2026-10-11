@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  </head>
+  <body>
+    <p th:inline="text">Olá, [[${recipientName}]]!</p>
+    <p th:inline="text">Você recebeu um novo feedback da psicóloga [[${psychologistName}]] sobre [[${feedbackSubject}]].</p>
+    <p>Acesse o SyncCarreira e abra a área de Agendamentos e Feedbacks para ler.</p>
+    <p>Atenciosamente,</p>
+    <p>Time SyncCarreira</p>
+  </body>
+</html>

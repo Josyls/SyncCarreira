@@ -21,6 +21,7 @@ public class EmailService {
     public static final String FIRST_ACCESS_TEMPLATE = "template-thymeleaf.html";
 
     public static final String JOURNEY_DOUBT_TEMPLATE = "journey-doubt-template.html";
+    public static final String FEEDBACK_TEMPLATE = "feedback-template.html";
 
     private final JavaMailSender emailSender;
 
