@@ -56,6 +56,11 @@ public class AnswerController {
                     content = { @Content(mediaType = "application/json", schema = @Schema(implementation = StudentDTO.class)) }
             ),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "Trilha ainda não liberada para o aluno (perfil não preenchido ou trilha anterior não concluída).",
+                    content = { @Content(mediaType = "application/json", schema = @Schema(implementation = CustomError.class)) }
+            ),
+            @ApiResponse(
                     responseCode = "422",
                     description = "Dados inválidos.",
                     content = { @Content(mediaType = "application/json", schema = @Schema(implementation = ValidationError.class)) }

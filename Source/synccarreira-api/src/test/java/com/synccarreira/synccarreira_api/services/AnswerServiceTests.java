@@ -9,6 +9,7 @@ import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.repositories.AnswerRepository;
 import com.synccarreira.synccarreira_api.repositories.QuestionOptionRepository;
 import com.synccarreira.synccarreira_api.repositories.StudentRepository;
+import com.synccarreira.synccarreira_api.services.exceptions.ForbiddenException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.tests.QuestionFactory;
 import com.synccarreira.synccarreira_api.tests.StudentFactory;
@@ -46,6 +47,9 @@ public class AnswerServiceTests {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private TrailService trailService;
+
     private Student student;
     private Question question;
     private QuestionOption option;
@@ -67,6 +71,7 @@ public class AnswerServiceTests {
         Mockito.when(questionOptionRepository.findById(option.getId())).thenReturn(Optional.of(option));
         Mockito.when(authService.authenticated()).thenReturn(student);
         Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.of(student));
+        Mockito.when(trailService.canAccess(question.getTrail().getId())).thenReturn(true);
         Mockito.when(answerRepository.save(any())).thenAnswer(invocation -> {
             Answer saved = invocation.getArgument(0);
             saved.setId(10L);
@@ -120,6 +125,19 @@ public class AnswerServiceTests {
         Assertions.assertEquals(3.0, student.getExactSciencesScore());
         Assertions.assertEquals(4.0, student.getBiologicalSciencesScore());
         Assertions.assertEquals(5.0, student.getArtsScore());
+    }
+
+    @Test
+    void insertShouldThrowForbiddenExceptionWhenTrailIsNotAccessible() {
+        Mockito.when(questionOptionRepository.findById(option.getId())).thenReturn(Optional.of(option));
+        Mockito.when(authService.authenticated()).thenReturn(student);
+        Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.of(student));
+        Mockito.when(trailService.canAccess(question.getTrail().getId())).thenReturn(false);
+
+        Assertions.assertThrows(ForbiddenException.class, () -> service.insert(dto));
+        Mockito.verify(answerRepository, Mockito.never()).deleteByStudentAndQuestion(anyLong(), anyLong());
+        Mockito.verify(answerRepository, Mockito.never()).save(any());
+        Mockito.verify(studentRepository, Mockito.never()).save(any());
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.synccarreira.synccarreira_api.entities.User;
 import com.synccarreira.synccarreira_api.repositories.AnswerRepository;
 import com.synccarreira.synccarreira_api.repositories.QuestionOptionRepository;
 import com.synccarreira.synccarreira_api.repositories.StudentRepository;
+import com.synccarreira.synccarreira_api.services.exceptions.ForbiddenException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,11 +28,19 @@ public class AnswerService {
 
     private final AuthService authService;
 
-    public AnswerService(final AnswerRepository answerRepository, final QuestionOptionRepository questionOptionRepository, final StudentRepository studentRepository, final AuthService authService) {
+    private final TrailService trailService;
+
+    public AnswerService(
+            final AnswerRepository answerRepository,
+            final QuestionOptionRepository questionOptionRepository,
+            final StudentRepository studentRepository,
+            final AuthService authService,
+            final TrailService trailService) {
         this.answerRepository = answerRepository;
         this.questionOptionRepository = questionOptionRepository;
         this.studentRepository = studentRepository;
         this.authService = authService;
+        this.trailService = trailService;
     }
 
     // O aluno é sempre o usuário do token: ninguém lê ou grava respostas de outro aluno
@@ -46,6 +55,10 @@ public class AnswerService {
     public AnswerDTO insert(AnswerInsertDTO dto) {
         Answer entity = new Answer();
         copyDtoToEntity(dto, entity);
+        // Mesma regra da listagem de perguntas: não é possível responder uma trilha ainda bloqueada
+        if (!trailService.canAccess(entity.getQuestionOption().getQuestion().getTrail().getId())) {
+            throw new ForbiddenException("Trilha não liberada. Preencha seu perfil e conclua a trilha anterior para responder estas perguntas.");
+        }
         answerRepository.deleteByStudentAndQuestion(entity.getStudent().getId(), entity.getQuestionOption().getQuestion().getId());
         entity = answerRepository.save(entity);
         recalculateStudentScore(entity.getStudent());
