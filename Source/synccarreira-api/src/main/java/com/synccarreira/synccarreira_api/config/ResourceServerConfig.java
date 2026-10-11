@@ -36,6 +36,7 @@ public class ResourceServerConfig {
 	private static final String ANSWERS = "/answers/**";
 	private static final String CLASSES = "/classes/**";
 	private static final String STUDENTS = "/students/**";
+	private static final String STUDENT_PROFILE = "/students/me";
 	private static final String PSYCHOLOGISTS = "/psychologists/**";
 	private static final String AUTH = "/auth/**";
 	private static final String APPOINTMENTS = "/appointments/**";
@@ -86,6 +87,9 @@ public class ResourceServerConfig {
 				.requestMatchers(HttpMethod.GET, PSYCHOLOGISTS).hasRole(ADMIN)
 				.requestMatchers(HttpMethod.PUT, PSYCHOLOGISTS).hasRole(ADMIN)
 				.requestMatchers(HttpMethod.DELETE, PSYCHOLOGISTS).hasRole(ADMIN)
+				// Perfil do próprio aluno (RF-14): precisa vir antes das regras gerais de /students/**
+				.requestMatchers(HttpMethod.GET, STUDENT_PROFILE).hasRole(USER)
+				.requestMatchers(HttpMethod.PUT, STUDENT_PROFILE + "/affinities").hasRole(USER)
 				.requestMatchers(HttpMethod.POST, STUDENTS).hasRole(ADMIN)
 				.requestMatchers(HttpMethod.GET, STUDENTS).hasAnyRole(PSYCHOLOGIST, ADMIN)
 				.requestMatchers(HttpMethod.PUT, STUDENTS).hasRole(ADMIN)

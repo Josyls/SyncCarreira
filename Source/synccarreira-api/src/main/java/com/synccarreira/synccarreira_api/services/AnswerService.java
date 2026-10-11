@@ -59,26 +59,9 @@ public class AnswerService {
         entity.setStudent(student);
     }
 
+    // Recalcula a partir de todas as respostas atuais somadas às afinidades do perfil (RF-14)
     private void recalculateStudentScore(Student student) {
-        List<Answer> allAnswers = answerRepository.findByStudentId(student.getId());
-
-        double humanities = 0.0, exactSciences = 0.0, biological = 0.0, arts = 0.0;
-
-        for (Answer answer : allAnswers) {
-            QuestionOption option = answer.getQuestionOption();
-            if (option != null) {
-                humanities    += option.getHumanitiesWeight();
-                exactSciences += option.getExactSciencesWeight();
-                biological    += option.getBiologicalSciencesWeight();
-                arts          += option.getArtsWeight();
-            }
-        }
-
-        student.setHumanitiesScore(humanities);
-        student.setExactSciencesScore(exactSciences);
-        student.setBiologicalSciencesScore(biological);
-        student.setArtsScore(arts);
-
+        student.recalculateScores(answerRepository.findByStudentId(student.getId()));
         studentRepository.save(student);
     }
 

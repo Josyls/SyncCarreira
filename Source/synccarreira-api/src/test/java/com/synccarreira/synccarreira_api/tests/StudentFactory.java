@@ -1,11 +1,15 @@
 package com.synccarreira.synccarreira_api.tests;
 
+import com.synccarreira.synccarreira_api.dto.StudentAffinityDTO;
 import com.synccarreira.synccarreira_api.dto.StudentDTO;
 import com.synccarreira.synccarreira_api.dto.StudentDetailsDTO;
 import com.synccarreira.synccarreira_api.dto.StudentInsertDTO;
+import com.synccarreira.synccarreira_api.dto.StudentProfileDTO;
 import com.synccarreira.synccarreira_api.dto.StudentScoreDTO;
 import com.synccarreira.synccarreira_api.entities.Role;
 import com.synccarreira.synccarreira_api.entities.Student;
+
+import java.time.Instant;
 
 public class StudentFactory {
 
@@ -80,5 +84,24 @@ public class StudentFactory {
                 "3º A",
                 "Escola Estadual Central"
         );
+    }
+
+    // Aluno que já respondeu as 4 perguntas de afinidade do perfil (RF-14)
+    public static Student createStudentWithCompletedProfile() {
+        Student student = createStudent();
+        student.setHumanitiesAffinity(3);
+        student.setExactSciencesAffinity(2);
+        student.setBiologicalSciencesAffinity(4);
+        student.setArtsAffinity(5);
+        student.setProfileCompletedAt(Instant.parse("2026-10-01T12:00:00Z"));
+        return student;
+    }
+
+    public static StudentAffinityDTO createStudentAffinityDTO() {
+        return new StudentAffinityDTO(3, 2, 4, 5);
+    }
+
+    public static StudentProfileDTO createStudentProfileDTO() {
+        return new StudentProfileDTO(createStudentWithCompletedProfile());
     }
 }

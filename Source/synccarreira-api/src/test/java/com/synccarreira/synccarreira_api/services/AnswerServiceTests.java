@@ -106,6 +106,23 @@ public class AnswerServiceTests {
     }
 
     @Test
+    void insertShouldAddProfileAffinitiesToRecalculatedScore() {
+        // Afinidades do perfil (RF-14): humanas 3, exatas 2, biológicas 4, artes 5
+        student = StudentFactory.createStudentWithCompletedProfile();
+        mockValidInsert();
+        Answer currentAnswer = new Answer(10L, student, option);
+        Mockito.when(answerRepository.findByStudentId(student.getId())).thenReturn(List.of(currentAnswer));
+
+        service.insert(dto);
+
+        // A opção escolhida soma 1.0 em exatas
+        Assertions.assertEquals(3.0, student.getHumanitiesScore());
+        Assertions.assertEquals(3.0, student.getExactSciencesScore());
+        Assertions.assertEquals(4.0, student.getBiologicalSciencesScore());
+        Assertions.assertEquals(5.0, student.getArtsScore());
+    }
+
+    @Test
     void insertShouldThrowResourceNotFoundExceptionWhenQuestionOptionDoesNotExist() {
         Mockito.when(questionOptionRepository.findById(nonExistingId)).thenReturn(Optional.empty());
         AnswerInsertDTO invalidDto = new AnswerInsertDTO(nonExistingId);
