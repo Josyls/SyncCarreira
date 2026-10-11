@@ -6,6 +6,7 @@ import com.synccarreira.synccarreira_api.dto.AppointmentFeedbackDTO;
 import com.synccarreira.synccarreira_api.dto.AppointmentInsertDTO;
 import com.synccarreira.synccarreira_api.entities.Appointment;
 import com.synccarreira.synccarreira_api.entities.Psychologist;
+import com.synccarreira.synccarreira_api.entities.SchoolClass;
 import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.User;
 import com.synccarreira.synccarreira_api.entities.enums.ScheduleStatus;
@@ -154,6 +155,7 @@ public class AppointmentService {
             List<Long> missingIds = studentIds.stream().filter(studentId -> !foundIds.contains(studentId)).toList();
             throw new ResourceNotFoundException("Aluno(s) não encontrado(s). ID(s): " + missingIds);
         }
+        validateSameInstitution(psychologist, students);
 
         entity.setTitle(dto.title());
         entity.setDescription(dto.description());
@@ -166,6 +168,28 @@ public class AppointmentService {
         entity.setGoogleEventId(dto.googleEventId());
         entity.setMeetLink(dto.meetLink());
         entity.setCalendarLink(dto.calendarLink());
+    }
+
+    // RNF-08: a psicóloga só agenda sessões com alunos da instituição dela
+    private static void validateSameInstitution(Psychologist psychologist, List<Student> students) {
+        if (psychologist.getInstitution() == null) {
+            throw new BusinessException("A psicóloga não está vinculada a nenhuma instituição.");
+        }
+        Long institutionId = psychologist.getInstitution().getId();
+        List<Long> outsideIds = students.stream()
+                .filter(student -> !belongsToInstitution(student, institutionId))
+                .map(Student::getId)
+                .toList();
+        if (!outsideIds.isEmpty()) {
+            throw new ForbiddenException("Acesso negado: aluno(s) de outra instituição ou sem turma. ID(s): " + outsideIds);
+        }
+    }
+
+    private static boolean belongsToInstitution(Student student, Long institutionId) {
+        SchoolClass schoolClass = student.getDeterminedSchoolClass();
+        return schoolClass != null
+                && schoolClass.getInstitution() != null
+                && institutionId.equals(schoolClass.getInstitution().getId());
     }
 
     private void validateStudentCount(ScheduleType scheduleType, int count) {

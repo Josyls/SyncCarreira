@@ -5,8 +5,10 @@ import com.synccarreira.synccarreira_api.dto.AppointmentDTO;
 import com.synccarreira.synccarreira_api.dto.AppointmentFeedbackDTO;
 import com.synccarreira.synccarreira_api.dto.AppointmentInsertDTO;
 import com.synccarreira.synccarreira_api.entities.Appointment;
+import com.synccarreira.synccarreira_api.entities.Institution;
 import com.synccarreira.synccarreira_api.entities.Psychologist;
 import com.synccarreira.synccarreira_api.entities.Role;
+import com.synccarreira.synccarreira_api.entities.SchoolClass;
 import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.User;
 import com.synccarreira.synccarreira_api.entities.enums.ScheduleStatus;
@@ -18,7 +20,9 @@ import com.synccarreira.synccarreira_api.services.exceptions.BusinessException;
 import com.synccarreira.synccarreira_api.services.exceptions.ForbiddenException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.tests.AppointmentFactory;
+import com.synccarreira.synccarreira_api.tests.InstitutionFactory;
 import com.synccarreira.synccarreira_api.tests.PsychologistFactory;
+import com.synccarreira.synccarreira_api.tests.SchoolClassFactory;
 import com.synccarreira.synccarreira_api.tests.StudentFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +80,11 @@ public class AppointmentServiceTests {
         student = StudentFactory.createStudent();
         studentId = student.getId();
         secondStudent = AppointmentFactory.createSecondStudent();
+        // Os alunos estudam na mesma instituição da psicóloga (RNF-08)
+        SchoolClass schoolClass = SchoolClassFactory.createSchoolClass();
+        schoolClass.setInstitution(psychologist.getInstitution());
+        student.setDeterminedSchoolClass(schoolClass);
+        secondStudent.setDeterminedSchoolClass(schoolClass);
         existingAppointmentId = 1L;
         nonExistingAppointmentId = 100L;
     }
@@ -170,6 +179,44 @@ public class AppointmentServiceTests {
 
         Assertions.assertEquals(ScheduleType.GRUPO, result.scheduleType());
         Assertions.assertEquals(2, result.students().size());
+    }
+
+    @Test
+    void insertShouldThrowForbiddenExceptionWhenStudentIsFromAnotherInstitution() {
+        AppointmentInsertDTO dto = AppointmentFactory.createGroupAppointmentInsertDTO();
+        SchoolClass otherSchoolClass = SchoolClassFactory.createSchoolClass();
+        otherSchoolClass.setId(2L);
+        Institution otherInstitution = InstitutionFactory.createInstitution();
+        otherInstitution.setId(2L);
+        otherSchoolClass.setInstitution(otherInstitution);
+        secondStudent.setDeterminedSchoolClass(otherSchoolClass);
+        Mockito.when(psychologistRepository.findById(dto.psychologistId())).thenReturn(Optional.of(psychologist));
+        Mockito.when(studentRepository.findAllById(Set.of(1L, 2L))).thenReturn(List.of(student, secondStudent));
+
+        Assertions.assertThrows(ForbiddenException.class, () -> service.insert(dto));
+        Mockito.verify(appointmentRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void insertShouldThrowForbiddenExceptionWhenStudentHasNoSchoolClass() {
+        AppointmentInsertDTO dto = AppointmentFactory.createIndividualAppointmentInsertDTO();
+        student.setDeterminedSchoolClass(null);
+        Mockito.when(psychologistRepository.findById(dto.psychologistId())).thenReturn(Optional.of(psychologist));
+        Mockito.when(studentRepository.findAllById(Set.of(1L))).thenReturn(List.of(student));
+
+        Assertions.assertThrows(ForbiddenException.class, () -> service.insert(dto));
+        Mockito.verify(appointmentRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void insertShouldThrowBusinessExceptionWhenPsychologistHasNoInstitution() {
+        AppointmentInsertDTO dto = AppointmentFactory.createIndividualAppointmentInsertDTO();
+        psychologist.setInstitution(null);
+        Mockito.when(psychologistRepository.findById(dto.psychologistId())).thenReturn(Optional.of(psychologist));
+        Mockito.when(studentRepository.findAllById(Set.of(1L))).thenReturn(List.of(student));
+
+        Assertions.assertThrows(BusinessException.class, () -> service.insert(dto));
+        Mockito.verify(appointmentRepository, Mockito.never()).save(any());
     }
 
     @Test
