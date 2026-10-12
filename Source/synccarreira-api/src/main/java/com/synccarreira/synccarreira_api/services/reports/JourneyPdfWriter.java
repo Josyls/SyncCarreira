@@ -16,6 +16,9 @@ import com.synccarreira.synccarreira_api.dto.StudentAffinityDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyContent;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyPdfData;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
+import com.synccarreira.synccarreira_api.dto.result.AreaScoreDTO;
+import com.synccarreira.synccarreira_api.dto.result.JourneyResultDTO;
+import com.synccarreira.synccarreira_api.dto.result.SubareaDTO;
 import com.synccarreira.synccarreira_api.entities.enums.KnowledgeArea;
 import com.synccarreira.synccarreira_api.entities.enums.TrailName;
 import org.springframework.stereotype.Component;
@@ -69,7 +72,7 @@ public class JourneyPdfWriter {
                 section++;
             }
             writeLinks(document, data.content().links());
-            writeResult(document, section, data.journey());
+            writeResult(document, section, data.journey(), data.result());
 
             document.close();
         } catch (DocumentException e) {
@@ -154,20 +157,34 @@ public class JourneyPdfWriter {
         }
     }
 
-    private static void writeResult(Document document, int section, JourneyRecordDTO journey) {
+    // RF-12: scores em percentual do máximo possível de cada área, área(s) em destaque e leque de subáreas sugeridas
+    private static void writeResult(Document document, int section, JourneyRecordDTO journey, JourneyResultDTO result) {
         document.add(sectionTitle(section + ". Resultado"));
-        PdfPTable table = keyValueTable();
-        addHeader(table, "Área", "Pontuação");
-        addRow(table, label(KnowledgeArea.HUMANAS), score(journey.humanitiesScore()));
-        addRow(table, label(KnowledgeArea.EXATAS), score(journey.exactSciencesScore()));
-        addRow(table, label(KnowledgeArea.BIOLOGICAS), score(journey.biologicalSciencesScore()));
-        addRow(table, label(KnowledgeArea.ARTES), score(journey.artsScore()));
+        document.add(new Paragraph("Percentual alcançado em cada área, considerando o máximo de pontos possível em cada uma:", NORMAL));
+
+        PdfPTable table = new PdfPTable(3);
+        table.setWidthPercentage(100f);
+        table.setSpacingBefore(4f);
+        table.setWidths(new float[] { 2f, 1f, 1f });
+        for (String title : List.of("Área", "Pontuação", "Percentual")) {
+            PdfPCell header = cell(title, BOLD);
+            header.setGrayFill(HEADER_GRAY);
+            table.addCell(header);
+        }
+        for (AreaScoreDTO score : result.scores()) {
+            Font font = score.highlighted() ? BOLD : NORMAL;
+            String area = score.highlighted() ? score.areaName() + " (destaque)" : score.areaName();
+            table.addCell(cell(area, font));
+            table.addCell(cell(score(score.score()) + " de " + score(score.maxScore()), font));
+            table.addCell(cell(score(score.percentage()) + "%", font));
+        }
         document.add(table);
 
-        List<KnowledgeArea> areas = journey.highestScoreAreas();
-        String highest = areas == null || areas.isEmpty()
-                ? "Ainda não há áreas de maior afinidade."
-                : "Áreas de maior afinidade: " + areas.stream().map(JourneyPdfWriter::label).collect(Collectors.joining(", ")) + ".";
+        List<KnowledgeArea> highlighted = result.highlightedAreas();
+        String highest = highlighted == null || highlighted.isEmpty()
+                ? "Ainda não há área em destaque."
+                : (highlighted.size() == 1 ? "Área em destaque: " : "Áreas em destaque (empate): ")
+                        + highlighted.stream().map(JourneyPdfWriter::label).collect(Collectors.joining(", ")) + ".";
         Paragraph highestParagraph = new Paragraph(highest, BOLD);
         highestParagraph.setSpacingBefore(8f);
         document.add(highestParagraph);
@@ -177,11 +194,31 @@ public class JourneyPdfWriter {
             document.add(new Paragraph("Ao final desta jornada, você sinalizou que ainda estava em dúvida sobre a escolha profissional" + when + ".", NORMAL));
         }
 
+        writeSuggestions(document, result.suggestions());
+
         // RN-07: o resultado é um leque de possibilidades, nunca um diagnóstico fechado
-        Paragraph disclaimer = new Paragraph("Este resultado é um ponto de partida para reflexão, e não um diagnóstico de carreira. "
-                + "Converse com a psicóloga da sua escola para explorar essas e outras possibilidades.", NOTE);
+        Paragraph disclaimer = new Paragraph(result.disclaimer(), NOTE);
         disclaimer.setSpacingBefore(12f);
         document.add(disclaimer);
+    }
+
+    private static void writeSuggestions(Document document, List<SubareaDTO> suggestions) {
+        if (suggestions == null || suggestions.isEmpty()) {
+            return;
+        }
+        Paragraph title = new Paragraph("Leque de possibilidades", SECTION);
+        title.setSpacingBefore(14f);
+        title.setSpacingAfter(4f);
+        document.add(title);
+        document.add(new Paragraph("Subáreas da sua área em destaque, com carreiras e cursos que você pode pesquisar "
+                + "(classificação baseada na Cine Brasil/Inep):", NORMAL));
+        for (SubareaDTO subarea : suggestions) {
+            Paragraph name = new Paragraph(subarea.name() + " (" + label(subarea.area()) + ")", BOLD);
+            name.setSpacingBefore(8f);
+            document.add(name);
+            document.add(new Paragraph(subarea.description(), NORMAL));
+            document.add(new Paragraph("Carreiras e cursos possíveis: " + String.join(", ", subarea.careers()) + ".", NORMAL));
+        }
     }
 
     private static Paragraph sectionTitle(String text) {

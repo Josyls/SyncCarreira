@@ -9,6 +9,7 @@ import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
 import com.synccarreira.synccarreira_api.entities.enums.QuestionType;
 import com.synccarreira.synccarreira_api.entities.enums.TrailName;
 import com.synccarreira.synccarreira_api.tests.JourneyFactory;
+import com.synccarreira.synccarreira_api.tests.ResultFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +38,8 @@ public class JourneyPdfWriterTests {
     @Test
     void writeShouldGenerateValidPdfWithJourneyContent() throws Exception {
         JourneyPdfData data = new JourneyPdfData("Ana Souza", "ana.souza@gmail.com", "3º ano",
-                JourneyFactory.createJourneyRecordDTO(), JourneyFactory.createJourneyContent());
+                JourneyFactory.createJourneyRecordDTO(), JourneyFactory.createJourneyContent(),
+                ResultFactory.createJourneyResult());
 
         byte[] pdf = writer.write(data);
 
@@ -46,6 +48,11 @@ public class JourneyPdfWriterTests {
         String text = extractText(pdf);
         Assertions.assertTrue(text.contains("Souza"));
         Assertions.assertTrue(text.contains("Autoconhecimento"));
+        // Resultado em percentual e leque de carreiras (RF-12)
+        Assertions.assertTrue(text.contains("47,9%") || text.contains("47.9%"));
+        Assertions.assertTrue(text.contains("Medicina e Cuidado em Sa"));
+        Assertions.assertTrue(text.contains("Enfermagem"));
+        Assertions.assertTrue(text.contains("diagn"));
     }
 
     @Test
@@ -59,7 +66,8 @@ public class JourneyPdfWriterTests {
                         List.of(new JourneyContent.AnswerContent("Pergunta sem resposta?", QuestionType.LIKERT, null)),
                         null, null)),
                 List.of());
-        JourneyPdfData data = new JourneyPdfData("Bruno Lima", "bruno@gmail.com", null, journey, content);
+        JourneyPdfData data = new JourneyPdfData("Bruno Lima", "bruno@gmail.com", null, journey, content,
+                ResultFactory.createEmptyJourneyResult());
 
         byte[] pdf = writer.write(data);
 

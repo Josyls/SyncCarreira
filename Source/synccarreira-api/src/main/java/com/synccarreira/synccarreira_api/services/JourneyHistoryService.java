@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -53,6 +52,8 @@ public class JourneyHistoryService {
     private final AuthService authService;
     private final ObjectMapper objectMapper;
     private final JourneyPdfWriter journeyPdfWriter;
+    private final JourneyResultService journeyResultService;
+    private final AreaScoreCalculator areaScoreCalculator;
 
     public JourneyHistoryService(
             final StudentRepository studentRepository,
@@ -63,7 +64,9 @@ public class JourneyHistoryService {
             final InformationLinkRepository informationLinkRepository,
             final AuthService authService,
             final ObjectMapper objectMapper,
-            final JourneyPdfWriter journeyPdfWriter) {
+            final JourneyPdfWriter journeyPdfWriter,
+            final JourneyResultService journeyResultService,
+            final AreaScoreCalculator areaScoreCalculator) {
         this.studentRepository = studentRepository;
         this.journeyRecordRepository = journeyRecordRepository;
         this.trailRepository = trailRepository;
@@ -73,6 +76,8 @@ public class JourneyHistoryService {
         this.authService = authService;
         this.objectMapper = objectMapper;
         this.journeyPdfWriter = journeyPdfWriter;
+        this.journeyResultService = journeyResultService;
+        this.areaScoreCalculator = areaScoreCalculator;
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +107,8 @@ public class JourneyHistoryService {
                 student.getEmail(),
                 student.getScholarYear(),
                 toDTO(journey, student),
-                content);
+                content,
+                journeyResultService.resultFor(journey));
 
         // Ex.: minha-jornada-2-2026-10-11.pdf
         String fileName = "minha-jornada-" + journey.getJourneyNumber() + "-"
@@ -182,7 +188,17 @@ public class JourneyHistoryService {
         journey.setExactSciencesAffinity(student.getExactSciencesAffinity());
         journey.setBiologicalSciencesAffinity(student.getBiologicalSciencesAffinity());
         journey.setArtsAffinity(student.getArtsAffinity());
-        List<KnowledgeArea> highestScoreAreas = highestScoreAreas(student);
+        // RF-12: guarda o máximo possível de cada área neste momento e as áreas em destaque pelo percentual,
+        // para que o resultado da jornada concluída não mude se as perguntas ou os pesos forem alterados depois
+        Map<KnowledgeArea, Double> maxScores = areaScoreCalculator.currentMaxScores();
+        journey.setMaxScores(maxScores);
+        List<KnowledgeArea> highestScoreAreas = AreaScoreCalculator.highlightedAreas(AreaScoreCalculator.calculate(
+                AreaScoreCalculator.areaMap(
+                        journey.getHumanitiesScore(),
+                        journey.getBiologicalSciencesScore(),
+                        journey.getExactSciencesScore(),
+                        journey.getArtsScore()),
+                maxScores));
         journey.setHighestScoreAreaList(highestScoreAreas);
         journey.setInDoubt(false);
 
@@ -229,18 +245,6 @@ public class JourneyHistoryService {
                         informationLinkRepository.findByKnowledgeAreaIsNullOrderByTopicAscIdAsc().stream())
                 .map(link -> new JourneyContent.LinkContent(link.getTopic(), link.getUrl(), link.getKnowledgeArea()))
                 .toList();
-    }
-
-    // Sem nenhuma pontuação, todas as áreas empatariam em zero: nesse caso não há área de destaque
-    private static List<KnowledgeArea> highestScoreAreas(Student student) {
-        boolean hasScore = Stream.of(
-                        student.getHumanitiesScore(),
-                        student.getExactSciencesScore(),
-                        student.getBiologicalSciencesScore(),
-                        student.getArtsScore())
-                .filter(Objects::nonNull)
-                .anyMatch(score -> score > 0);
-        return hasScore ? student.highestScoreAreas() : List.of();
     }
 
     // Na jornada atual (concluída, ainda sem nova jornada iniciada) a dúvida pode ter sido sinalizada depois do registro

@@ -12,6 +12,7 @@ import org.hibernate.annotations.OnDeleteAction;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 // Registro congelado de uma jornada concluída pelo aluno (RF-15).
@@ -79,6 +80,25 @@ public class JourneyRecord {
     @Getter @Setter
     private Double artsScore;
 
+    // Máximo possível de cada área no momento da conclusão (RF-12): afinidade máxima + maior peso de cada pergunta.
+    // Guardado para que o percentual da jornada concluída não mude se as perguntas ou os pesos forem alterados depois.
+    // Nulo apenas em jornadas concluídas antes do RF-12.
+    @Column(name = "score_maximo_humanas")
+    @Getter @Setter
+    private Double humanitiesMaxScore;
+
+    @Column(name = "score_maximo_exatas")
+    @Getter @Setter
+    private Double exactSciencesMaxScore;
+
+    @Column(name = "score_maximo_biologicas")
+    @Getter @Setter
+    private Double biologicalSciencesMaxScore;
+
+    @Column(name = "score_maximo_artes")
+    @Getter @Setter
+    private Double artsMaxScore;
+
     @Column(name = "afinidade_humanas")
     @Getter @Setter
     private Integer humanitiesAffinity;
@@ -112,6 +132,18 @@ public class JourneyRecord {
     @Column(name = "conteudo", nullable = false, columnDefinition = "TEXT")
     @Getter @Setter
     private String content;
+
+    public boolean hasMaxScores() {
+        return humanitiesMaxScore != null && exactSciencesMaxScore != null
+                && biologicalSciencesMaxScore != null && artsMaxScore != null;
+    }
+
+    public void setMaxScores(Map<KnowledgeArea, Double> maxScores) {
+        this.humanitiesMaxScore = maxScores.get(KnowledgeArea.HUMANAS);
+        this.biologicalSciencesMaxScore = maxScores.get(KnowledgeArea.BIOLOGICAS);
+        this.exactSciencesMaxScore = maxScores.get(KnowledgeArea.EXATAS);
+        this.artsMaxScore = maxScores.get(KnowledgeArea.ARTES);
+    }
 
     public List<KnowledgeArea> highestScoreAreaList() {
         if (highestScoreAreas == null || highestScoreAreas.isBlank()) {

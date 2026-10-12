@@ -2,6 +2,7 @@ package com.synccarreira.synccarreira_api.services;
 
 import com.synccarreira.synccarreira_api.dto.journey.JourneyContent;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyPdfData;
+import com.synccarreira.synccarreira_api.dto.result.JourneyResultDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyRecordDTO;
 import com.synccarreira.synccarreira_api.dto.journey.JourneyStatusDTO;
 import com.synccarreira.synccarreira_api.dto.psychologist.ReportFile;
@@ -22,6 +23,7 @@ import com.synccarreira.synccarreira_api.entities.enums.TrailName;
 import com.synccarreira.synccarreira_api.repositories.AnswerRepository;
 import com.synccarreira.synccarreira_api.repositories.InformationLinkRepository;
 import com.synccarreira.synccarreira_api.repositories.JourneyRecordRepository;
+import com.synccarreira.synccarreira_api.repositories.QuestionRepository;
 import com.synccarreira.synccarreira_api.repositories.StudentRepository;
 import com.synccarreira.synccarreira_api.repositories.SynthesisRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
@@ -29,6 +31,7 @@ import com.synccarreira.synccarreira_api.services.exceptions.BusinessException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.services.reports.JourneyPdfWriter;
 import com.synccarreira.synccarreira_api.tests.JourneyFactory;
+import com.synccarreira.synccarreira_api.tests.ResultFactory;
 import com.synccarreira.synccarreira_api.tests.StudentFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +79,12 @@ public class JourneyHistoryServiceTests {
     @Mock
     private JourneyPdfWriter journeyPdfWriter;
 
+    @Mock
+    private JourneyResultService journeyResultService;
+
+    @Mock
+    private QuestionRepository questionRepository;
+
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     private JourneyHistoryService service;
@@ -88,7 +97,8 @@ public class JourneyHistoryServiceTests {
     @BeforeEach
     void setUp() {
         service = new JourneyHistoryService(studentRepository, journeyRecordRepository, trailRepository, answerRepository,
-                synthesisRepository, informationLinkRepository, authService, objectMapper, journeyPdfWriter);
+                synthesisRepository, informationLinkRepository, authService, objectMapper, journeyPdfWriter, journeyResultService,
+                new AreaScoreCalculator(questionRepository));
 
         // Scores: humanas 7.5, exatas 6.0, biológicas 8.25, artes 5.0 (maior: biológicas)
         student = StudentFactory.createStudentWithCompletedProfile();
@@ -115,6 +125,13 @@ public class JourneyHistoryServiceTests {
         return new Synthesis(trail.getId(), content, student, trail, JourneyFactory.CONCLUDED_AT);
     }
 
+    // Banco de perguntas com o peso máximo informado para cada área (o máximo possível soma a afinidade máxima, 5)
+    private void mockQuestionBank(double humanities, double biologicalSciences, double exactSciences, double arts) {
+        Question bankQuestion = new Question(20L, "Pergunta", QuestionType.MULTIPLA_ESCOLHA, firstTrail, new ArrayList<>());
+        bankQuestion.getOptions().add(new QuestionOption(200L, "A", humanities, biologicalSciences, exactSciences, arts, bankQuestion));
+        Mockito.when(questionRepository.findAll()).thenReturn(List.of(bankQuestion));
+    }
+
     private void mockConcludedJourney() {
         Mockito.when(journeyRecordRepository.existsByStudentIdAndJourneyNumber(student.getId(), 1)).thenReturn(false);
         Mockito.when(trailRepository.findAllByOrderBySequentialOrderAsc()).thenReturn(List.of(firstTrail, informationTrail));
@@ -126,6 +143,8 @@ public class JourneyHistoryServiceTests {
     @Test
     void registerJourneyIfConcludedShouldSaveRecordWithSnapshotOfJourney() {
         mockConcludedJourney();
+        // Mesmo máximo (15) em todas as áreas: o maior percentual coincide com o maior score bruto
+        mockQuestionBank(10.0, 10.0, 10.0, 10.0);
         Mockito.when(answerRepository.findByStudentId(student.getId())).thenReturn(List.of(new Answer(1L, student, option)));
         Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(List.of(KnowledgeArea.BIOLOGICAS)))
                 .thenReturn(List.of(new InformationLink(1L, "Cursos de Biologia", "https://exemplo.com/bio", KnowledgeArea.BIOLOGICAS)));
@@ -146,6 +165,8 @@ public class JourneyHistoryServiceTests {
         Assertions.assertEquals(8.25, journey.getBiologicalSciencesScore());
         Assertions.assertEquals(5, journey.getArtsAffinity());
         Assertions.assertEquals(List.of(KnowledgeArea.BIOLOGICAS), journey.highestScoreAreaList());
+        Assertions.assertEquals(15.0, journey.getBiologicalSciencesMaxScore());
+        Assertions.assertTrue(journey.hasMaxScores());
         Assertions.assertFalse(journey.getInDoubt());
 
         JourneyContent content = objectMapper.readValue(journey.getContent(), JourneyContent.class);
@@ -156,6 +177,29 @@ public class JourneyHistoryServiceTests {
         Assertions.assertEquals(JourneyFactory.ANSWER, trail.answers().getFirst().answer());
         Assertions.assertEquals(JourneyFactory.SYNTHESIS, trail.synthesis());
         Assertions.assertEquals(2, content.links().size());
+    }
+
+    @Test
+    void registerJourneyIfConcludedShouldStoreMaxScoresAndHighlightAreaWithHighestPercentage() {
+        mockConcludedJourney();
+        // Biológicas tem o maior score bruto (8.25), mas o máximo dela é 45: 18,3%. Humanas: 7.5 de 15 = 50%
+        mockQuestionBank(10.0, 40.0, 10.0, 10.0);
+        Mockito.when(answerRepository.findByStudentId(student.getId())).thenReturn(List.of());
+        Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(List.of(KnowledgeArea.HUMANAS)))
+                .thenReturn(List.of(new InformationLink(3L, "Direito", "https://exemplo.com/direito", KnowledgeArea.HUMANAS)));
+
+        service.registerJourneyIfConcluded(student);
+
+        ArgumentCaptor<JourneyRecord> captor = ArgumentCaptor.forClass(JourneyRecord.class);
+        Mockito.verify(journeyRecordRepository).save(captor.capture());
+        JourneyRecord journey = captor.getValue();
+        Assertions.assertEquals(List.of(KnowledgeArea.HUMANAS), journey.highestScoreAreaList());
+        Assertions.assertEquals(15.0, journey.getHumanitiesMaxScore());
+        Assertions.assertEquals(45.0, journey.getBiologicalSciencesMaxScore());
+        Assertions.assertEquals(15.0, journey.getExactSciencesMaxScore());
+        Assertions.assertEquals(15.0, journey.getArtsMaxScore());
+        JourneyContent content = objectMapper.readValue(journey.getContent(), JourneyContent.class);
+        Assertions.assertEquals("Direito", content.links().getFirst().topic());
     }
 
     @Test
@@ -294,6 +338,8 @@ public class JourneyHistoryServiceTests {
         Mockito.when(journeyRecordRepository.findByIdAndStudentId(1L, student.getId())).thenReturn(Optional.of(journey));
         byte[] pdf = new byte[] { 1, 2, 3 };
         Mockito.when(journeyPdfWriter.write(any())).thenReturn(pdf);
+        JourneyResultDTO journeyResult = ResultFactory.createJourneyResult();
+        Mockito.when(journeyResultService.resultFor(journey)).thenReturn(journeyResult);
 
         ReportFile result = service.generateMyJourneyPdf(1L);
 
@@ -304,6 +350,7 @@ public class JourneyHistoryServiceTests {
         Assertions.assertEquals(student.getName(), captor.getValue().studentName());
         Assertions.assertEquals(1, captor.getValue().journey().journeyNumber());
         Assertions.assertEquals(JourneyFactory.SYNTHESIS, captor.getValue().content().trails().getFirst().synthesis());
+        Assertions.assertSame(journeyResult, captor.getValue().result());
     }
 
     @Test
@@ -313,6 +360,7 @@ public class JourneyHistoryServiceTests {
 
         Assertions.assertThrows(ResourceNotFoundException.class, () -> service.generateMyJourneyPdf(99L));
         Mockito.verify(journeyPdfWriter, Mockito.never()).write(any());
+        Mockito.verify(journeyResultService, Mockito.never()).resultFor(any());
     }
 
     @Test
