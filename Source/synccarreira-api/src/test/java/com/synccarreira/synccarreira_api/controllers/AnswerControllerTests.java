@@ -18,6 +18,7 @@ import com.synccarreira.synccarreira_api.tests.StudentFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -106,5 +107,54 @@ public class AnswerControllerTests {
         result.andExpect(status().isOk());
         result.andExpect(jsonPath("$[0].id").value(10L));
         verify(service).findForLoggedStudent(1L);
+    }
+
+    // Tratamento de exceções: corpo ilegível (400), valor incompatível (422) e bloqueio no banco (409)
+
+    @Test
+    void insertShouldReturnBadRequestWhenJsonIsMalformed() throws Exception {
+        ResultActions result = mockMvc.perform(post("/answers")
+                .content("{\"questionOptionId\": 1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isBadRequest());
+        result.andExpect(jsonPath("$.error").value("Corpo da requisição ausente ou com JSON malformado."));
+        verify(service, never()).insert(any());
+    }
+
+    @Test
+    void insertShouldReturnBadRequestWhenBodyIsMissing() throws Exception {
+        ResultActions result = mockMvc.perform(post("/answers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isBadRequest());
+        verify(service, never()).insert(any());
+    }
+
+    @Test
+    void insertShouldReturnUnprocessableContentWhenValueHasWrongType() throws Exception {
+        ResultActions result = mockMvc.perform(post("/answers")
+                .content("{\"questionOptionId\": \"abc\"}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isUnprocessableContent());
+        result.andExpect(jsonPath("$.error").value("Valor inválido em um ou mais campos da requisição."));
+        verify(service, never()).insert(any());
+    }
+
+    @Test
+    void insertShouldReturnConflictWhenDatabaseLockFails() throws Exception {
+        when(service.insert(any())).thenThrow(new CannotAcquireLockException("Deadlock found when trying to get lock"));
+
+        ResultActions result = mockMvc.perform(post("/answers")
+                .content("{\"questionOptionId\": 1}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON));
+
+        result.andExpect(status().isConflict());
+        result.andExpect(jsonPath("$.error").value("Os dados estavam sendo alterados por outra operação ao mesmo tempo. Tente novamente."));
     }
 }
