@@ -32,15 +32,15 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             WHERE id_usuario = :studentId""")
     void setSchoolClass(@Param("studentId") Long studentId, @Param("classId") Long classId);
 
-    // Só marca o aluno que ainda não está em dúvida: retorna 0 quando a dúvida já tinha sido sinalizada
-    @Modifying
-    // Busca o aluno travando a linha dele até o fim da transação (SELECT ... FOR UPDATE).
+    // Busca o aluno travando a linha dele até o fim da transação (SELECT... FOR ‘UPDATE’).
     // Usado ao gravar respostas: as gravações de um mesmo aluno passam a acontecer uma de cada vez,
     // sem bloquear as de outros alunos.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT obj FROM Student obj WHERE obj.id = :id")
     Optional<Student> findByIdForUpdate(@Param("id") Long id);
 
+    // Só marca o aluno que ainda não está em dúvida: retorna 0 quando a dúvida já tinha sido sinalizada
+    @Modifying
     @Query(nativeQuery = true, value = """
             UPDATE tb_aluno
             SET em_duvida = TRUE, data_sinalizacao_duvida = :flaggedAt
