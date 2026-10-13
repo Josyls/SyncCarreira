@@ -8,6 +8,7 @@ import com.synccarreira.synccarreira_api.entities.Role;
 import com.synccarreira.synccarreira_api.repositories.InstitutionRepository;
 import com.synccarreira.synccarreira_api.repositories.PsychologistRepository;
 import com.synccarreira.synccarreira_api.repositories.RoleRepository;
+import com.synccarreira.synccarreira_api.services.exceptions.ConflictException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.tests.InstitutionFactory;
 import com.synccarreira.synccarreira_api.tests.PsychologistFactory;
@@ -131,10 +132,10 @@ public class PsychologistServiceTests {
     }
 
     @Test
-    void createShouldReturnIllegalArgumentExceptionWhenNameAndCrpAlreadyExist() {
+    void createShouldReturnConflictExceptionWhenNameAndCrpAlreadyExist() {
         Mockito.when(psychologistRepository.existsByNameAndCrp(psychologistInsertDTO.getName(), psychologistInsertDTO.getCrp())).thenReturn(true);
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> {
+        Assertions.assertThrows(ConflictException.class, () -> {
             service.create(psychologistInsertDTO);
         });
 

@@ -24,4 +24,11 @@ public interface SynthesisRepository extends JpaRepository<Synthesis, Long> {
             "JOIN st.determinedSchoolClass c " +
             "WHERE c.institution.id = :institutionId")
     List<SubmittedSynthesisProjection> findSubmittedByInstitution(@Param("institutionId") Long institutionId);
+
+    @Query("SELECT s FROM Synthesis s " +
+            "JOIN FETCH s.trail t " +
+            "JOIN FETCH s.student st " +
+            "WHERE st.determinedSchoolClass.id = :schoolClassId " +
+            "ORDER BY st.name, t.sequentialOrder")
+    List<Synthesis> findBySchoolClassId(@Param("schoolClassId") Long schoolClassId);
 }

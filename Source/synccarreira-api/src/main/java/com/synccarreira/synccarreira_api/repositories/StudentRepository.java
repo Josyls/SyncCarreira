@@ -43,4 +43,11 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             "WHERE c.institution.id = :institutionId " +
             "ORDER BY c.name, obj.name")
     List<PanelStudentProjection> searchPanelStudentsByInstitution(@Param("institutionId") Long institutionId);
+
+    @Query("SELECT obj FROM Student obj " +
+            "JOIN FETCH obj.determinedSchoolClass c " +
+            "LEFT JOIN FETCH c.institution " +
+            "WHERE c.id = :schoolClassId " +
+            "ORDER BY obj.name")
+    List<Student> searchBySchoolClassId(@Param("schoolClassId") Long schoolClassId);
 }

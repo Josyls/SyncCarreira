@@ -3,6 +3,7 @@ package com.synccarreira.synccarreira_api.services;
 import com.synccarreira.synccarreira_api.dto.JourneyDoubtDTO;
 import com.synccarreira.synccarreira_api.entities.Institution;
 import com.synccarreira.synccarreira_api.entities.Psychologist;
+import com.synccarreira.synccarreira_api.entities.SchoolClass;
 import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.Trail;
 import com.synccarreira.synccarreira_api.entities.User;
@@ -104,7 +105,13 @@ public class JourneyService {
 
     // O aviso é enviado por e-mail às psicólogas com contrato vigente da instituição do aluno, após o commit
     private void notifyPsychologists(Student student, Instant flaggedAt) {
-        Institution institution = student.getDeterminedSchoolClass().getInstitution();
+        SchoolClass schoolClass = student.getDeterminedSchoolClass();
+        if (schoolClass == null) {
+            log.warn("Aluno {} sinalizou dúvida, mas não está vinculado a nenhuma turma.", student.getId());
+            return;
+        }
+
+        Institution institution = schoolClass.getInstitution();
         if (institution == null) {
             log.warn("Aluno {} sinalizou dúvida, mas a turma dele não está vinculada a nenhuma instituição.", student.getId());
             return;
@@ -125,7 +132,7 @@ public class JourneyService {
             map.put("recipientName", psychologist.getName());
             map.put("studentName", student.getName());
             map.put("studentEmail", student.getEmail());
-            map.put("schoolClassName", student.getDeterminedSchoolClass().getName());
+            map.put("schoolClassName", schoolClass.getName());
             map.put("institutionName", institutionName(institution));
             map.put("flaggedAt", FLAGGED_AT_FORMATTER.format(flaggedAt));
 

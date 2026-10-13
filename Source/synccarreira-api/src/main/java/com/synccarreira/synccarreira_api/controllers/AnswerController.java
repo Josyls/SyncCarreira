@@ -26,7 +26,7 @@ public class AnswerController {
     @Autowired
     private AnswerService answerService;
 
-    @Operation(summary = "Busca todas as respostas que um aluno deu às perguntas de uma trilha, pelo id do aluno e id da trilha.")
+    @Operation(summary = "Busca todas as respostas que o aluno logado deu às perguntas de uma trilha, pelo id da trilha.")
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
@@ -39,19 +39,16 @@ public class AnswerController {
             )
     })
     @GetMapping
-    public ResponseEntity<List<AnswerDTO>> findByStudentAndTrail(
-            @Parameter(description = "Id do aluno que criou essas respostas.", required = true)
-            @RequestParam(value="studentId", required = true)
-            Long studentId,
+    public ResponseEntity<List<AnswerDTO>> findForLoggedStudent(
             @Parameter(description = "Id da trilha à qual as respostas pertencem.", required = true)
             @RequestParam(value="trailId", required = true)
             Long trailId
     ) {
-        List<AnswerDTO> dto = answerService.findByStudentAndTrail(studentId, trailId);
+        List<AnswerDTO> dto = answerService.findForLoggedStudent(trailId);
         return ResponseEntity.ok(dto);
     }
 
-    @Operation(summary = "Insere uma nova resposta do aluno.")
+    @Operation(summary = "Insere uma nova resposta do aluno logado.")
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "201",

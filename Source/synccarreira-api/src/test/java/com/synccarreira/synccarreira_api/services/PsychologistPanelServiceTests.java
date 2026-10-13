@@ -30,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -123,11 +124,21 @@ public class PsychologistPanelServiceTests {
 
     private void mockPanelData() {
         Mockito.when(psychologistRepository.findById(psychologistId)).thenReturn(Optional.of(psychologist));
+        mockProgressData();
+        Mockito.when(studentRepository.searchPanelStudentsByInstitution(institutionId)).thenReturn(students);
+    }
+
+    private void mockProgressData() {
         Mockito.when(trailRepository.findAllByOrderBySequentialOrderAsc()).thenReturn(trails);
         Mockito.when(questionRepository.countQuestionsByTrail()).thenReturn(questionCounts);
         Mockito.when(answerRepository.countAnsweredQuestionsByInstitution(institutionId)).thenReturn(answeredQuestions);
         Mockito.when(synthesisRepository.findSubmittedByInstitution(institutionId)).thenReturn(submittedSyntheses);
-        Mockito.when(studentRepository.searchPanelStudentsByInstitution(institutionId)).thenReturn(students);
+    }
+
+    private static PanelDTOs.StudentStatus createStudentStatus(Long studentId, ProgressStatus journeyStatus, boolean inDoubt) {
+        return new PanelDTOs.StudentStatus(
+                studentId, "Aluno " + studentId, 1L, "3º ano A", 0, 8, 0, 0, 3,
+                TrailName.AUTOCONHECIMENTO, false, journeyStatus, inDoubt, null, List.of());
     }
 
     @Test
@@ -296,5 +307,132 @@ public class PsychologistPanelServiceTests {
 
         Assertions.assertThrows(BusinessException.class, () -> service.findPanel(psychologistId));
         Mockito.verify(studentRepository, Mockito.never()).searchPanelStudentsByInstitution(any());
+    }
+
+    @Test
+    void findAccessibleInstitutionIdShouldReturnInstitutionIdWhenLoggedUserIsTheSamePsychologist() {
+        Mockito.when(authService.authenticated()).thenReturn(psychologist);
+        Mockito.when(psychologistRepository.findById(psychologistId)).thenReturn(Optional.of(psychologist));
+
+        Long result = service.findAccessibleInstitutionId(psychologistId);
+
+        Assertions.assertEquals(institutionId, result);
+    }
+
+    @Test
+    void findAccessibleInstitutionIdShouldReturnInstitutionIdWhenLoggedUserIsAdmin() {
+        Mockito.when(authService.authenticated()).thenReturn(admin);
+        Mockito.when(psychologistRepository.findById(psychologistId)).thenReturn(Optional.of(psychologist));
+
+        Long result = service.findAccessibleInstitutionId(psychologistId);
+
+        Assertions.assertEquals(institutionId, result);
+    }
+
+    @Test
+    void findAccessibleInstitutionIdShouldThrowForbiddenExceptionWhenLoggedUserIsAnotherPsychologist() {
+        Mockito.when(authService.authenticated()).thenReturn(otherPsychologist);
+
+        Assertions.assertThrows(ForbiddenException.class, () -> service.findAccessibleInstitutionId(psychologistId));
+        Mockito.verify(psychologistRepository, Mockito.never()).findById(any());
+    }
+
+    @Test
+    void findAccessibleInstitutionIdShouldThrowResourceNotFoundExceptionWhenPsychologistDoesNotExist() {
+        Mockito.when(authService.authenticated()).thenReturn(admin);
+        Mockito.when(psychologistRepository.findById(nonExistingPsychologistId)).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> service.findAccessibleInstitutionId(nonExistingPsychologistId));
+    }
+
+    @Test
+    void findAccessibleInstitutionIdShouldThrowBusinessExceptionWhenPsychologistHasNoInstitution() {
+        psychologist.setInstitution(null);
+        Mockito.when(authService.authenticated()).thenReturn(psychologist);
+        Mockito.when(psychologistRepository.findById(psychologistId)).thenReturn(Optional.of(psychologist));
+
+        Assertions.assertThrows(BusinessException.class, () -> service.findAccessibleInstitutionId(psychologistId));
+    }
+
+    @Test
+    void buildStudentStatusesShouldReturnProgressOnlyOfGivenStudents() {
+        mockProgressData();
+        // Só o Bruno: os dados de progresso dos outros alunos da instituição são ignorados
+        List<PanelStudentProjection> onlyBruno = List.of(students.get(1));
+
+        List<PanelDTOs.StudentStatus> result = service.buildStudentStatuses(institutionId, onlyBruno);
+
+        Assertions.assertEquals(1, result.size());
+        PanelDTOs.StudentStatus bruno = result.get(0);
+        Assertions.assertEquals(11L, bruno.studentId());
+        Assertions.assertEquals("Bruno", bruno.studentName());
+        Assertions.assertEquals(ProgressStatus.EM_ANDAMENTO, bruno.journeyStatus());
+        Assertions.assertEquals(5, bruno.answeredQuestions());
+        Assertions.assertEquals(TrailName.INFLUENCIAS, bruno.currentTrail());
+        Assertions.assertEquals(3, bruno.trails().size());
+        Mockito.verify(studentRepository, Mockito.never()).searchPanelStudentsByInstitution(any());
+        Mockito.verifyNoInteractions(authService, psychologistRepository);
+    }
+
+    @Test
+    void buildStudentStatusesShouldKeepOrderOfGivenStudents() {
+        mockProgressData();
+        List<PanelStudentProjection> reversed = List.of(students.get(2), students.get(1), students.get(0));
+
+        List<PanelDTOs.StudentStatus> result = service.buildStudentStatuses(institutionId, reversed);
+
+        Assertions.assertEquals(List.of(12L, 11L, 10L), result.stream().map(PanelDTOs.StudentStatus::studentId).toList());
+    }
+
+    @Test
+    void buildStudentStatusesShouldKeepDoubtDataOfStudent() {
+        mockProgressData();
+        Instant flaggedAt = Instant.parse("2026-10-05T12:00:00Z");
+        List<PanelStudentProjection> anaInDoubt = List.of(new PanelStudentProjection(10L, "Ana", 1L, "3º ano A", true, flaggedAt));
+
+        PanelDTOs.StudentStatus ana = service.buildStudentStatuses(institutionId, anaInDoubt).get(0);
+
+        Assertions.assertTrue(ana.inDoubt());
+        Assertions.assertEquals(flaggedAt, ana.doubtFlaggedAt());
+    }
+
+    @Test
+    void buildStudentStatusesShouldReturnEmptyListWhenNoStudentsAreGiven() {
+        mockProgressData();
+
+        List<PanelDTOs.StudentStatus> result = service.buildStudentStatuses(institutionId, List.of());
+
+        Assertions.assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void summarizeShouldCountStudentsByJourneyStatusAndDoubt() {
+        List<PanelDTOs.StudentStatus> statuses = List.of(
+                createStudentStatus(1L, ProgressStatus.NAO_INICIADA, false),
+                createStudentStatus(2L, ProgressStatus.EM_ANDAMENTO, false),
+                createStudentStatus(3L, ProgressStatus.EM_ANDAMENTO, false),
+                createStudentStatus(4L, ProgressStatus.CONCLUIDA, true),
+                createStudentStatus(5L, ProgressStatus.CONCLUIDA, false));
+
+        PanelDTOs.PanelSummary result = service.summarize(statuses);
+
+        Assertions.assertEquals(5, result.totalStudents());
+        Assertions.assertEquals(1, result.notStartedStudents());
+        Assertions.assertEquals(2, result.inProgressStudents());
+        Assertions.assertEquals(2, result.concludedStudents());
+        Assertions.assertEquals(1, result.inDoubtStudents());
+        Assertions.assertSame(statuses, result.students());
+    }
+
+    @Test
+    void summarizeShouldReturnZeroedSummaryWhenThereAreNoStudents() {
+        PanelDTOs.PanelSummary result = service.summarize(List.of());
+
+        Assertions.assertEquals(0, result.totalStudents());
+        Assertions.assertEquals(0, result.notStartedStudents());
+        Assertions.assertEquals(0, result.inProgressStudents());
+        Assertions.assertEquals(0, result.concludedStudents());
+        Assertions.assertEquals(0, result.inDoubtStudents());
+        Assertions.assertTrue(result.students().isEmpty());
     }
 }

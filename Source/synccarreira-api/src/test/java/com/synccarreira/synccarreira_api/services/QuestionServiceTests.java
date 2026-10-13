@@ -39,12 +39,9 @@ public class QuestionServiceTests {
     private TrailRepository trailRepository;
 
     @Mock
-    private PsychologistService psychologistService;
-
-    @Mock
     private TrailService trailService;
 
-    private Long existingQuestionId, nonExistingQuestionId, existingTrailId, nonExistingTrailId, psychologistId;
+    private Long existingQuestionId, nonExistingQuestionId, existingTrailId, nonExistingTrailId;
     private Trail trail;
     private Question question, question1, openQuestion;
     private QuestionDTO questionDTO, openQuestionDTO, emptyOptionsQuestionDTO, nonExistingTrailQuestionDTO;
@@ -56,7 +53,6 @@ public class QuestionServiceTests {
         nonExistingQuestionId = 100L;
         existingTrailId = 1L;
         nonExistingTrailId = 100L;
-        psychologistId = 1L;
 
         trail = TrailFactory.createTrail();
         question = QuestionFactory.createQuestion();
@@ -238,11 +234,11 @@ public class QuestionServiceTests {
     }
 
     @Test
-    void deleteQuestionByIdShouldDoNothingWhenIdExistsAndContractIsActive() {
+    void deleteQuestionByIdShouldDoNothingWhenIdExists() {
         Mockito.when(questionRepository.existsById(existingQuestionId)).thenReturn(true);
 
         Assertions.assertDoesNotThrow(() -> {
-            service.deleteQuestionById(existingQuestionId, psychologistId);
+            service.deleteQuestionById(existingQuestionId);
         });
 
         Mockito.verify(questionRepository).deleteById(existingQuestionId);
@@ -253,16 +249,7 @@ public class QuestionServiceTests {
         Mockito.when(questionRepository.existsById(nonExistingQuestionId)).thenReturn(false);
 
         Assertions.assertThrows(ResourceNotFoundException.class, () -> {
-            service.deleteQuestionById(nonExistingQuestionId, psychologistId);
-        });
-    }
-
-    @Test
-    void deleteQuestionByIdShouldReturnIllegalStateExceptionWhenContractIsExpired() {
-        Mockito.doThrow(IllegalStateException.class).when(psychologistService).validateIfContractIsActive(psychologistId);
-
-        Assertions.assertThrows(IllegalStateException.class, () -> {
-            service.deleteQuestionById(existingQuestionId, psychologistId);
+            service.deleteQuestionById(nonExistingQuestionId);
         });
     }
 }

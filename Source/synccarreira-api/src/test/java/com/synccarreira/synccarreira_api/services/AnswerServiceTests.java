@@ -43,23 +43,29 @@ public class AnswerServiceTests {
     @Mock
     private StudentRepository studentRepository;
 
+    @Mock
+    private AuthService authService;
+
     private Student student;
     private Question question;
     private QuestionOption option;
     private AnswerInsertDTO dto;
     private Long nonExistingId;
+    private Long trailId;
 
     @BeforeEach
     void setUp() {
         student = StudentFactory.createStudent();
         question = QuestionFactory.createQuestion();
         option = question.getOptions().getFirst();
-        dto = new AnswerInsertDTO(student.getId(), option.getId());
+        dto = new AnswerInsertDTO(option.getId());
         nonExistingId = 100L;
+        trailId = 1L;
     }
 
     private void mockValidInsert() {
         Mockito.when(questionOptionRepository.findById(option.getId())).thenReturn(Optional.of(option));
+        Mockito.when(authService.authenticated()).thenReturn(student);
         Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.of(student));
         Mockito.when(answerRepository.save(any())).thenAnswer(invocation -> {
             Answer saved = invocation.getArgument(0);
@@ -102,10 +108,53 @@ public class AnswerServiceTests {
     @Test
     void insertShouldThrowResourceNotFoundExceptionWhenQuestionOptionDoesNotExist() {
         Mockito.when(questionOptionRepository.findById(nonExistingId)).thenReturn(Optional.empty());
-        AnswerInsertDTO invalidDto = new AnswerInsertDTO(student.getId(), nonExistingId);
+        AnswerInsertDTO invalidDto = new AnswerInsertDTO(nonExistingId);
 
         Assertions.assertThrows(ResourceNotFoundException.class, () -> service.insert(invalidDto));
         Mockito.verify(answerRepository, Mockito.never()).deleteByStudentAndQuestion(anyLong(), anyLong());
         Mockito.verify(answerRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void insertShouldSaveAnswerForLoggedStudent() {
+        mockValidInsert();
+        Mockito.when(answerRepository.findByStudentId(student.getId())).thenReturn(List.of());
+
+        AnswerDTO result = service.insert(dto);
+
+        Assertions.assertEquals(student.getId(), result.getStudent().getId());
+        Mockito.verify(answerRepository).deleteByStudentAndQuestion(student.getId(), question.getId());
+    }
+
+    @Test
+    void insertShouldThrowResourceNotFoundExceptionWhenLoggedUserIsNotAStudent() {
+        Mockito.when(questionOptionRepository.findById(option.getId())).thenReturn(Optional.of(option));
+        Mockito.when(authService.authenticated()).thenReturn(student);
+        Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> service.insert(dto));
+        Mockito.verify(answerRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void findForLoggedStudentShouldReturnOnlyAnswersOfLoggedStudent() {
+        Mockito.when(authService.authenticated()).thenReturn(student);
+        Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.of(student));
+        Mockito.when(answerRepository.findByStudentAndTrail(student.getId(), trailId)).thenReturn(List.of(new Answer(10L, student, option)));
+
+        List<AnswerDTO> result = service.findForLoggedStudent(trailId);
+
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(student.getId(), result.getFirst().getStudent().getId());
+        Mockito.verify(answerRepository).findByStudentAndTrail(student.getId(), trailId);
+    }
+
+    @Test
+    void findForLoggedStudentShouldThrowResourceNotFoundExceptionWhenLoggedUserIsNotAStudent() {
+        Mockito.when(authService.authenticated()).thenReturn(student);
+        Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.empty());
+
+        Assertions.assertThrows(ResourceNotFoundException.class, () -> service.findForLoggedStudent(trailId));
+        Mockito.verify(answerRepository, Mockito.never()).findByStudentAndTrail(anyLong(), anyLong());
     }
 }

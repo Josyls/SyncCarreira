@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -72,7 +73,7 @@ public class TrailController {
                     content = @Content
             )
     })
-    public ResponseEntity<TrailDTO> create(@RequestBody TrailDTO dto) {
+    public ResponseEntity<TrailDTO> create(@Valid @RequestBody TrailDTO dto) {
         TrailDTO trailDto = trailService.create(dto);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
@@ -102,7 +103,7 @@ public class TrailController {
     public ResponseEntity<TrailDTO> update(
             @Parameter(description = "Id da trilha que será atualizada.", required = true)
             @PathVariable Long id,
-            @RequestBody TrailUpdateDTO dto
+            @Valid @RequestBody TrailUpdateDTO dto
     ) {
         return ResponseEntity.ok(trailService.update(id, dto));
     }

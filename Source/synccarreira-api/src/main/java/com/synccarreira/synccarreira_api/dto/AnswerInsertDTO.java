@@ -9,10 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AnswerInsertDTO {
 
-    @NotNull(message = "O estudante associado é obrigatório")
-    @Getter
-    private Long studentId;
-
     @NotNull(message = "A opção escolhida é obrigatória")
     @Getter
     private Long questionOptionId;

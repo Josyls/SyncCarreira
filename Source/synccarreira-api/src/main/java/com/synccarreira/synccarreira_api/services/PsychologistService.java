@@ -8,6 +8,7 @@ import com.synccarreira.synccarreira_api.entities.Role;
 import com.synccarreira.synccarreira_api.repositories.InstitutionRepository;
 import com.synccarreira.synccarreira_api.repositories.PsychologistRepository;
 import com.synccarreira.synccarreira_api.repositories.RoleRepository;
+import com.synccarreira.synccarreira_api.services.exceptions.ConflictException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
@@ -55,7 +56,7 @@ public class PsychologistService {
     @Transactional
     public PsychologistDTO create(PsychologistInsertDTO dto) {
         if (psychologistRepository.existsByNameAndCrp(dto.getName(), dto.getCrp())) {
-            throw new IllegalArgumentException(
+            throw new ConflictException(
                     "Já existe um(a) psicólogo(a) cadastrado(a) com o nome '" + dto.getName() +
                     "' e CRP '" + dto.getCrp() + "'.");
         }

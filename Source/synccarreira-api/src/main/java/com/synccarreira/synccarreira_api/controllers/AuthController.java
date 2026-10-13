@@ -16,7 +16,7 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @CrossOrigin(origins = "http://localhost:3306")
+    @CrossOrigin(origins = "http://localhost:5173")
     @PutMapping(value = "/new-password")
     public ResponseEntity<Void> saveNewPassword(@Valid @RequestBody NewPasswordDTO dto) {
         authService.saveNewPassword(dto);

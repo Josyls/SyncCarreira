@@ -66,9 +66,21 @@ public class PsychologistPanelService {
 
     @Transactional(readOnly = true)
     public PanelDTOs.PanelSummary findPanel(Long psychologistId) {
-        validateSelfAccess(psychologistId);
-        Long institutionId = findInstitutionId(psychologistId);
+        Long institutionId = findAccessibleInstitutionId(psychologistId);
+        List<PanelDTOs.StudentStatus> students = buildStudentStatuses(
+                institutionId,
+                studentRepository.searchPanelStudentsByInstitution(institutionId));
+        return summarize(students);
+    }
 
+    // Valida que o usuário logado pode acessar o painel e retorna a instituição da psicóloga
+    public Long findAccessibleInstitutionId(Long psychologistId) {
+        validateSelfAccess(psychologistId);
+        return findInstitutionId(psychologistId);
+    }
+
+    // Calcula o progresso na jornada dos alunos informados, que devem ser da instituição
+    public List<PanelDTOs.StudentStatus> buildStudentStatuses(Long institutionId, List<PanelStudentProjection> students) {
         List<Trail> allTrails = trailRepository.findAllByOrderBySequentialOrderAsc();
         List<Trail> trails = allTrails.stream()
                 .filter(trail -> trail.getName() != TrailName.INFORMACAO)
@@ -93,8 +105,7 @@ public class PsychologistPanelService {
                         SubmittedSynthesisProjection::studentId,
                         Collectors.mapping(SubmittedSynthesisProjection::trailId, Collectors.toSet())));
 
-        List<PanelDTOs.StudentStatus> students = studentRepository.searchPanelStudentsByInstitution(institutionId)
-                .stream()
+        return students.stream()
                 .map(student -> buildStudentStatus(
                         student,
                         trails,
@@ -103,7 +114,9 @@ public class PsychologistPanelService {
                         answeredQuestionsByStudent.getOrDefault(student.studentId(), Map.of()),
                         submittedSynthesesByStudent.getOrDefault(student.studentId(), Set.of())))
                 .toList();
+    }
 
+    public PanelDTOs.PanelSummary summarize(List<PanelDTOs.StudentStatus> students) {
         return new PanelDTOs.PanelSummary(
                 students.size(),
                 countByJourneyStatus(students, ProgressStatus.NAO_INICIADA),

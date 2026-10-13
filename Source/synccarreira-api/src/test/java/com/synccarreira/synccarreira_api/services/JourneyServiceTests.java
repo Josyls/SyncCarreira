@@ -240,6 +240,23 @@ public class JourneyServiceTests {
     }
 
     @Test
+    void flagDoubtShouldNotNotifyWhenStudentHasNoSchoolClass() {
+        student.setDeterminedSchoolClass(null);
+        Mockito.when(authService.authenticated()).thenReturn(student);
+        Mockito.when(studentRepository.findById(existingStudentId)).thenReturn(Optional.of(student));
+        Mockito.when(trailRepository.findAll()).thenReturn(trailList);
+        Mockito.when(synthesisRepository.existsByStudentIdAndTrailId(existingStudentId, trail.getId())).thenReturn(true);
+        Mockito.when(trailService.areAllQuestionsAnswered(trail, existingStudentId)).thenReturn(true);
+        Mockito.when(studentRepository.flagDoubt(Mockito.eq(existingStudentId), any())).thenReturn(1);
+
+        JourneyDoubtDTO result = service.flagDoubt();
+
+        Assertions.assertTrue(result.inDoubt());
+        Mockito.verify(psychologistRepository, Mockito.never()).findByInstitutionId(any());
+        Mockito.verify(eventPublisher, Mockito.never()).publishEvent(any(Object.class));
+    }
+
+    @Test
     void flagDoubtShouldNotNotifyWhenInstitutionHasNoPsychologistWithValidContract() {
         Mockito.when(authService.authenticated()).thenReturn(student);
         Mockito.when(studentRepository.findById(existingStudentId)).thenReturn(Optional.of(student));

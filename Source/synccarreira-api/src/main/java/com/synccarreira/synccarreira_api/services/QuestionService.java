@@ -24,18 +24,14 @@ public class QuestionService {
 
     private final TrailRepository trailRepository;
 
-    private final PsychologistService psychologistService;
-
     private final TrailService trailService;
 
     public QuestionService(
             final QuestionRepository questionRepository,
             final TrailRepository trailRepository,
-            final PsychologistService psychologistService,
             final TrailService trailService) {
         this.questionRepository = questionRepository;
         this.trailRepository = trailRepository;
-        this.psychologistService = psychologistService;
         this.trailService = trailService;
     }
 
@@ -112,9 +108,7 @@ public class QuestionService {
     }
 
     @Transactional
-    public void deleteQuestionById(Long id, Long psicologaId) {
-        psychologistService.validateIfContractIsActive(psicologaId);
-
+    public void deleteQuestionById(Long id) {
         if (!questionRepository.existsById(id)) {
             throw new ResourceNotFoundException("Pergunta não encontrada. ID: " + id);
         }

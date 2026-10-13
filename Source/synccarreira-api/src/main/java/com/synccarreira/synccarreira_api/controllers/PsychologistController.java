@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -66,7 +67,7 @@ public class PsychologistController {
                     content = @Content
             )
     })
-    public ResponseEntity<PsychologistDTO> createPsychologist(@RequestBody PsychologistInsertDTO dto) {
+    public ResponseEntity<PsychologistDTO> createPsychologist(@Valid @RequestBody PsychologistInsertDTO dto) {
         PsychologistDTO psicologa = psychologistService.create(dto);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
@@ -88,7 +89,7 @@ public class PsychologistController {
                     content = @Content
             )
     })
-    public ResponseEntity<PsychologistDTO> update(@PathVariable Long id, @RequestBody PsychologistInsertDTO dto) {
+    public ResponseEntity<PsychologistDTO> update(@PathVariable Long id, @Valid @RequestBody PsychologistInsertDTO dto) {
         return ResponseEntity.ok(psychologistService.update(id, dto));
     }
 
