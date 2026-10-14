@@ -5,6 +5,7 @@ import com.synccarreira.synccarreira_api.dto.result.AreaScoreDTO;
 import com.synccarreira.synccarreira_api.entities.Question;
 import com.synccarreira.synccarreira_api.entities.QuestionOption;
 import com.synccarreira.synccarreira_api.entities.enums.KnowledgeArea;
+import com.synccarreira.synccarreira_api.entities.enums.QuestionType;
 import com.synccarreira.synccarreira_api.repositories.QuestionRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,8 +69,9 @@ public class AreaScoreCalculator {
                 .toList();
     }
 
-    // Máximo possível por área: a afinidade máxima do perfil (RF-14) mais, em cada pergunta, o maior peso entre as opções.
-    // O aluno fica com uma única opção por pergunta (o AnswerService substitui a resposta anterior), por isso o maior peso.
+    // Máximo possível por área: a afinidade máxima do perfil (RF-14) mais o máximo de cada pergunta.
+    // Nas perguntas de MULTIPLA_ESCOLHA o aluno pode marcar todas as opções, então o máximo é a soma dos pesos positivos.
+    // Nos demais tipos o aluno fica com uma única opção (o AnswerService substitui a resposta anterior), então é o maior peso.
     // É calculado a partir das perguntas cadastradas agora. Na conclusão da jornada, esse máximo é guardado no
     // JourneyRecord, para que o resultado de uma jornada concluída não mude se as perguntas ou os pesos mudarem depois.
     @Transactional(readOnly = true)
@@ -78,12 +80,7 @@ public class AreaScoreCalculator {
         Arrays.stream(KnowledgeArea.values()).forEach(area -> maxScores.put(area, (double) StudentAffinityDTO.MAX));
         for (Question question : questionRepository.findAll()) {
             for (KnowledgeArea area : KnowledgeArea.values()) {
-                double bestOption = question.getOptions().stream()
-                        .mapToDouble(option -> weight(option, area))
-                        .max()
-                        .orElse(0.0);
-                // Um peso negativo não aumenta o máximo possível
-                maxScores.merge(area, Math.max(0.0, bestOption), Double::sum);
+                maxScores.merge(area, questionMaxScore(question, area), Double::sum);
             }
         }
         return maxScores;
@@ -97,6 +94,20 @@ public class AreaScoreCalculator {
         values.put(KnowledgeArea.EXATAS, exactSciences);
         values.put(KnowledgeArea.ARTES, arts);
         return values;
+    }
+
+    // Um peso negativo não aumenta o máximo possível
+    private static double questionMaxScore(Question question, KnowledgeArea area) {
+        if (question.getQuestionType() == QuestionType.MULTIPLA_ESCOLHA) {
+            return question.getOptions().stream()
+                    .mapToDouble(option -> Math.max(0.0, weight(option, area)))
+                    .sum();
+        }
+        double bestOption = question.getOptions().stream()
+                .mapToDouble(option -> weight(option, area))
+                .max()
+                .orElse(0.0);
+        return Math.max(0.0, bestOption);
     }
 
     private static double weight(QuestionOption option, KnowledgeArea area) {

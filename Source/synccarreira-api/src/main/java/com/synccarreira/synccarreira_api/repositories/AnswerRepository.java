@@ -22,7 +22,8 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
     List<Answer> findByStudentId(Long studentId);
 
     // Respostas do aluno para uma pergunta, da mais antiga para a mais nova.
-    // Normalmente há no máximo uma; mais de uma só em dados gravados antes da substituição de respostas.
+    // Em perguntas de MULTIPLA_ESCOLHA há uma por opção marcada. Nos demais tipos normalmente há no máximo uma;
+    // mais de uma só em dados gravados antes da substituição de respostas.
     @Query("SELECT a FROM Answer a " +
             "JOIN FETCH a.questionOption qo " +
             "WHERE a.student.id = :studentId " +
