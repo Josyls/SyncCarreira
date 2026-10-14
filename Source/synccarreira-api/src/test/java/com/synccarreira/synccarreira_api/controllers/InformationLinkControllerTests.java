@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.synccarreira.synccarreira_api.dto.InformationLinkDTO;
 import com.synccarreira.synccarreira_api.dto.InformationTrailDTO;
+import com.synccarreira.synccarreira_api.dto.result.AreaScoreDTO;
 import com.synccarreira.synccarreira_api.entities.enums.KnowledgeArea;
 import com.synccarreira.synccarreira_api.services.InformationLinkService;
 import com.synccarreira.synccarreira_api.services.exceptions.ForbiddenException;
@@ -46,6 +47,7 @@ public class InformationLinkControllerTests {
         InformationTrailDTO dto = new InformationTrailDTO(
                 List.of(KnowledgeArea.BIOLOGICAS),
                 StudentFactory.createStudentScoreDTO(),
+                List.of(new AreaScoreDTO(KnowledgeArea.BIOLOGICAS, "Biológicas", 8.25, 15.0, 55.0, true)),
                 List.of(new InformationLinkDTO(1L, "Educação Física", "https://www.confef.org.br/", KnowledgeArea.BIOLOGICAS)),
                 List.of(new InformationLinkDTO(2L, "ProUni", "https://acessounico.mec.gov.br/prouni", null)));
         when(service.findForLoggedStudent()).thenReturn(dto);
@@ -55,6 +57,8 @@ public class InformationLinkControllerTests {
         result.andExpect(status().isOk());
         result.andExpect(jsonPath("$.recommendedAreas[0]").value("BIOLOGICAS"));
         result.andExpect(jsonPath("$.score.biologicalSciencesScore").value(8.25));
+        result.andExpect(jsonPath("$.areaScores[0].percentage").value(55.0));
+        result.andExpect(jsonPath("$.areaScores[0].highlighted").value(true));
         result.andExpect(jsonPath("$.careerLinks[0].topic").value("Educação Física"));
         result.andExpect(jsonPath("$.careerLinks[0].url").value("https://www.confef.org.br/"));
         result.andExpect(jsonPath("$.universityAccessLinks[0].topic").value("ProUni"));

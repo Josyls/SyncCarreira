@@ -21,11 +21,15 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
     @Query("SELECT a FROM Answer a JOIN FETCH a.questionOption WHERE a.student.id = :studentId")
     List<Answer> findByStudentId(Long studentId);
 
-    @Modifying
-    @Query("DELETE FROM Answer a " +
+    // Respostas do aluno para uma pergunta, da mais antiga para a mais nova.
+    // Em perguntas de MULTIPLA_ESCOLHA há uma por opção marcada. Nos demais tipos normalmente há no máximo uma;
+    // mais de uma só em dados gravados antes da substituição de respostas.
+    @Query("SELECT a FROM Answer a " +
+            "JOIN FETCH a.questionOption qo " +
             "WHERE a.student.id = :studentId " +
-            "AND a.questionOption.id IN (SELECT qo.id FROM QuestionOption qo WHERE qo.question.id = :questionId)")
-    int deleteByStudentAndQuestion(@Param("studentId") Long studentId, @Param("questionId") Long questionId);
+            "AND qo.question.id = :questionId " +
+            "ORDER BY a.id")
+    List<Answer> findByStudentAndQuestion(@Param("studentId") Long studentId, @Param("questionId") Long questionId);
 
     @Query("SELECT new com.synccarreira.synccarreira_api.projections.AnsweredQuestionsProjection(s.id, q.trail.id, COUNT(DISTINCT q.id)) " +
             "FROM Answer a " +
@@ -36,4 +40,9 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
             "WHERE c.institution.id = :institutionId " +
             "GROUP BY s.id, q.trail.id")
     List<AnsweredQuestionsProjection> countAnsweredQuestionsByInstitution(@Param("institutionId") Long institutionId);
+
+    // Usado ao iniciar uma nova jornada (RF-15): as respostas da jornada anterior já estão guardadas em JourneyRecord
+    @Modifying
+    @Query("DELETE FROM Answer a WHERE a.student.id = :studentId")
+    int deleteAllByStudentId(@Param("studentId") Long studentId);
 }

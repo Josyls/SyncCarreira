@@ -4,13 +4,16 @@ import com.synccarreira.synccarreira_api.dto.UserDTO;
 import com.synccarreira.synccarreira_api.entities.Answer;
 import com.synccarreira.synccarreira_api.entities.Question;
 import com.synccarreira.synccarreira_api.entities.QuestionOption;
+import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.Trail;
 import com.synccarreira.synccarreira_api.entities.enums.QuestionType;
 import com.synccarreira.synccarreira_api.entities.enums.TrailName;
 import com.synccarreira.synccarreira_api.repositories.AnswerRepository;
+import com.synccarreira.synccarreira_api.repositories.StudentRepository;
 import com.synccarreira.synccarreira_api.repositories.SynthesisRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
+import com.synccarreira.synccarreira_api.tests.StudentFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,9 @@ public class TrailServiceTests {
     @Mock
     private SynthesisRepository synthesisRepository;
 
+    @Mock
+    private StudentRepository studentRepository;
+
     private Long studentId, nonExistingTrailId;
     private Trail firstTrail, secondTrail;
     private Question firstQuestion, secondQuestion;
@@ -77,12 +83,33 @@ public class TrailServiceTests {
         Mockito.when(userService.findMe()).thenReturn(new UserDTO(studentId, "Ana Souza", "ana.souza@gmail.com", Set.of()));
     }
 
-    @Test
-    void canAccessShouldReturnTrueWhenTrailIsTheFirstOne() {
+    private void mockAccessToFirstTrail(Optional<Student> loggedStudent) {
         Mockito.when(trailRepository.findById(firstTrail.getId())).thenReturn(Optional.of(firstTrail));
+        Mockito.when(userService.findMe()).thenReturn(new UserDTO(studentId, "Ana Souza", "ana.souza@gmail.com", Set.of()));
+        Mockito.when(studentRepository.findById(studentId)).thenReturn(loggedStudent);
+    }
+
+    @Test
+    void canAccessShouldReturnTrueWhenTrailIsTheFirstOneAndStudentCompletedProfile() {
+        mockAccessToFirstTrail(Optional.of(StudentFactory.createStudentWithCompletedProfile()));
 
         Assertions.assertTrue(service.canAccess(firstTrail.getId()));
         Mockito.verify(answerRepository, Mockito.never()).findByStudentAndTrail(any(), any());
+    }
+
+    @Test
+    void canAccessShouldReturnFalseWhenTrailIsTheFirstOneAndStudentDidNotCompleteProfile() {
+        mockAccessToFirstTrail(Optional.of(StudentFactory.createStudent()));
+
+        Assertions.assertFalse(service.canAccess(firstTrail.getId()));
+    }
+
+    @Test
+    void canAccessShouldReturnTrueWhenTrailIsTheFirstOneAndLoggedUserIsNotAStudent() {
+        // Admin e psicóloga não preenchem perfil de aluno e continuam consultando as perguntas da primeira trilha
+        mockAccessToFirstTrail(Optional.empty());
+
+        Assertions.assertTrue(service.canAccess(firstTrail.getId()));
     }
 
     @Test
