@@ -22,6 +22,7 @@ import {
   getPsychologistAppointments, createAppointment, updateAppointment,
   cancelAppointment, sendFeedback, displayStatus, USE_MOCK,
 } from '../../services/appointmentService'
+import { getPsychologistPanel } from '../../services/psychologistPanelService'
 import {
   isGoogleConfigured, isGoogleConnected, connectGoogle, disconnectGoogle,
   createMeetEvent, updateMeetEvent, cancelMeetEvent, preloadGoogle,
@@ -58,6 +59,9 @@ export default function PsicologaAgendamentos() {
 
   const [students, setStudents]               = useState([])
   const [loadingStudents, setLoadingStudents] = useState(true)
+  const [doubtStudents, setDoubtStudents]     = useState([])
+  const [loadingDoubts, setLoadingDoubts]     = useState(true)
+  const [doubtError, setDoubtError]           = useState('')
 
   const [tab, setTab]             = useState('AGENDADA')
   const [googleOn, setGoogleOn]   = useState(isGoogleConnected())
@@ -89,6 +93,25 @@ export default function PsicologaAgendamentos() {
       .catch(() => setStudents([]))
       .finally(() => setLoadingStudents(false))
   }, [])
+
+  const loadDoubtStudents = useCallback(async () => {
+    if (!psychologist.id) return
+    setLoadingDoubts(true)
+    setDoubtError('')
+    try {
+      const panel = await getPsychologistPanel(psychologist.id)
+      const flagged = (panel.students ?? [])
+        .filter(student => student.inDoubt)
+        .sort((a, b) => new Date(a.doubtFlaggedAt) - new Date(b.doubtFlaggedAt))
+      setDoubtStudents(flagged)
+    } catch (err) {
+      setDoubtError(err.message)
+    } finally {
+      setLoadingDoubts(false)
+    }
+  }, [psychologist.id])
+
+  useEffect(() => { loadDoubtStudents() }, [loadDoubtStudents])
 
   useEffect(() => {
     if (!toast) return
@@ -201,6 +224,11 @@ export default function PsicologaAgendamentos() {
 
   const pendingFeedback = grouped.REALIZADA.filter(a => !a.feedback).length
   const visible = grouped[tab]
+  const doubtStudentIds = new Set(doubtStudents.map(student => student.studentId))
+  const studentsWithDoubtStatus = students.map(student => ({
+    ...student,
+    inDoubt: doubtStudentIds.has(student.id),
+  }))
 
   return (
     <>
@@ -323,8 +351,12 @@ export default function PsicologaAgendamentos() {
       {modal?.type === 'form' && (
         <SessionFormModal
           initial={modal.appointment}
-          students={students}
+          students={studentsWithDoubtStatus}
           loadingStudents={loadingStudents}
+          doubtStudentsLoading={loadingDoubts}
+          doubtStudentsError={doubtError}
+          doubtStudentCount={doubtStudents.length}
+          onRetryDoubtStudents={loadDoubtStudents}
           onSubmit={handleSaveSession}
           onClose={() => setModal(null)}
         />

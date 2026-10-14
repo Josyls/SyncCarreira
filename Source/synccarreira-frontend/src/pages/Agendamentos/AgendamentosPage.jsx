@@ -14,13 +14,14 @@ import './Agendamentos.css'
 
 export default function AgendamentosPage() {
   const { user } = useAuth()
+  const showPsychologistView = isPsychologist(user)
 
   return (
     <div className="ag-root">
       <AppHeader />
       <main className="ag-main">
-        <div className={`ag-content${isPsychologist(user) ? ' ag-content--wide' : ''}`}>
-          {isPsychologist(user) ? <PsicologaAgendamentos /> : <AlunoAgendamentos />}
+        <div className={`ag-content${showPsychologistView ? ' ag-content--wide' : ''}`}>
+          {showPsychologistView ? <PsicologaAgendamentos /> : <AlunoAgendamentos />}
         </div>
       </main>
     </div>

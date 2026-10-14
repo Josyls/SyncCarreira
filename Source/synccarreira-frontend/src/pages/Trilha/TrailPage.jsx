@@ -45,17 +45,16 @@ const LIKERT_VALUES = [1, 2, 3, 4, 5]
 
 // ─── Helpers de carregamento ──────────────────────────────────
 
-/** Mensagem exibida quando o GET /answers falha (deixa claro se o problema é do backend). */
-function describeAnswersError(err, userId) {
+/** Mensagem simples para quando o histórico de respostas não puder ser carregado. */
+function answersErrorMessage(err) {
   if (!err.response) {
-    return '🚨 [NETWORK ERROR] Sem resposta do servidor. Verifica se o backend local está de pé.'
+    return 'Não foi possível conectar ao serviço de respostas. Verifique sua conexão e tente novamente.'
   }
   const status = err.response.status
-  const url = err.config?.url || '/answers'
-  if (status === 403) {
-    return `🚨 [BACKEND ERROR] O endpoint GET ${url} retornou HTTP 403 Forbidden para o Aluno ID: ${userId}. O backend está bloqueando o acesso de leitura histórico deste perfil!`
+  if (status === 401 || status === 403) {
+    return 'Não foi possível carregar seu histórico de respostas. Tente novamente mais tarde.'
   }
-  return `🚨 [BACKEND ERROR] Erro inesperado HTTP ${status} no endpoint GET ${url}`
+  return 'Ocorreu um erro ao carregar seu histórico de respostas. Tente novamente.'
 }
 
 /**
@@ -214,7 +213,7 @@ export default function TrailPage() {
   const [loadingPage, setLoadingPage] = useState(true)
   const [pageError, setPageError]     = useState('')
   const [saveStatus, setSaveStatus]   = useState({})
-  const [backendError, setBackendError] = useState('') // 🚨 Estado para escancarar o erro do backend
+  const [answersWarning, setAnswersWarning] = useState('')
 
   // ── Carregamento inicial ───────────────────────────────────
   useEffect(() => {
@@ -228,7 +227,7 @@ export default function TrailPage() {
     async function load() {
       setLoadingPage(true)
       setPageError('')
-      setBackendError('')
+      setAnswersWarning('')
 
       let questionsData = []
 
@@ -253,14 +252,14 @@ export default function TrailPage() {
         return
       }
 
-      // 2. Busca o histórico de respostas (Aqui capturamos o 403 explicitamente para cobrar o backend)
+      // 2. Busca o histórico de respostas para restaurar o progresso da trilha.
       let answersData = []
       try {
         answersData = await getAnswers(user.id, numericTrailId)
         console.log('[TrailPage] Respostas carregadas:', answersData?.length)
       } catch (answersErr) {
-        console.error('[TrailPage] Falha ao carregar respostas (Pegamos o erro):', answersErr)
-        setBackendError(describeAnswersError(answersErr, user.id))
+        console.error('[TrailPage] Falha ao carregar histórico de respostas:', answersErr)
+        setAnswersWarning(answersErrorMessage(answersErr))
       }
 
       // 3. Monta o mapa se as respostas existirem
@@ -343,26 +342,10 @@ export default function TrailPage() {
             onBack={() => navigate('/home')}
         />
 
-        {/* 🚨 BANNER DE PROVA DE ERRO PARA COBRAR O BACKEND 🚨 */}
-        {backendError && (
-            <div style={{
-              backgroundColor: '#fee2e2',
-              border: '2px solid #ef4444',
-              color: '#b91c1c',
-              padding: '18px 24px',
-              margin: '20px auto 0',
-              maxWidth: '720px',
-              width: 'calc(100% - 48px)',
-              borderRadius: '10px',
-              fontWeight: 'bold',
-              fontSize: '13.5px',
-              fontFamily: 'monospace',
-              lineHeight: '1.5',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
-              whiteSpace: 'pre-wrap'
-            }}>
-              {backendError}
-            </div>
+        {answersWarning && (
+            <p className="tp-answers-warning" role="status">
+              {answersWarning}
+            </p>
         )}
 
         <main className="tp-main">

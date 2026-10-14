@@ -50,6 +50,29 @@
 
 .ag-section { margin-top: 8px; }
 
+.ag-doubt-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-md);
+  background: #f7f8fa;
+}
+
+.ag-doubt-filter__control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--sc-text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ag-doubt-filter__control input { width: 16px; height: 16px; accent-color: #a8561d; }
+.ag-doubt-filter__count { margin-left: auto; color: var(--sc-muted); font-size: 12.5px; font-weight: 500; }
+.ag-doubt-filter__error { display: flex; align-items: center; gap: 10px; color: var(--sc-error-txt); font-size: 12.5px; }
+
 /* ── Botões ────────────────────────────────────────────────── */
 .ag-btn {
   display: inline-flex;

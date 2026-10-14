@@ -54,7 +54,6 @@ export default function AppRoutes() {
             <Route path="/agendamentos" element={
                 <PrivateRoute><AgendamentosPage /></PrivateRoute>
             } />
-
             <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
     )
