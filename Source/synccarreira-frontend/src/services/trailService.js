@@ -77,3 +77,27 @@ export const postAnswer = async ({ content = '', studentId, questionOptionId }) 
   })
   return response.data
 }
+
+// ─── Síntese (RF-11) ──────────────────────────────────────────
+
+/**
+ * Busca as sínteses enviadas pelo aluno logado (todas as trilhas).
+ * @returns {Promise<Array>}
+ */
+export const getMySyntheses = async () => {
+  const response = await api.get('/syntheses/me')
+  const data = response.data
+  // Aceita lista simples ou Page<...>
+  return Array.isArray(data) ? data : (data?.content ?? [])
+}
+
+/**
+ * Salva a síntese do aluno para uma trilha. Texto livre, sem restrição de conteúdo.
+ * @param {Object} payload
+ * @param {string} payload.content
+ * @param {number} payload.trailId
+ */
+export const postSynthesis = async ({ content, trailId }) => {
+  const response = await api.post('/syntheses', { content, trailId })
+  return response.data
+}

@@ -8,6 +8,9 @@
  * 3. Mapeia respostas existentes por questionOptionId para pré-selecionar
  * 4. Ao selecionar uma opção, faz POST /answers (backend substitui a anterior)
  * 5. Calcula progresso em tempo real (respostas únicas por questão)
+ * 6. (RF-11) Com todas as perguntas respondidas, exibe o campo de síntese (texto livre).
+ *    A trilha só é marcada como concluída depois que a síntese é salva (POST /syntheses).
+ *    As sínteses já enviadas vêm de GET /syntheses/me.
  *
  * Tipos de pergunta suportados:
  * - CHECKBOX  → opções clicáveis (radio visual — 1 seleção por vez)
@@ -24,6 +27,8 @@ import {
   getQuestionsByTrail,
   getAnswers,
   postAnswer,
+  getMySyntheses,
+  postSynthesis,
 } from '../../services/trailService'
 import './TrailPage.css'
 
@@ -197,6 +202,47 @@ function LikertQuestion({ question, selectedOptionId, onSelect, saveStatus }) {
   )
 }
 
+/**
+ * RF-11 — Síntese final da trilha: texto livre, sem restrição de conteúdo.
+ * Depois de salva, fica somente leitura (a API só oferece POST).
+ */
+function SynthesisCard({ value, onChange, onSave, saveStatus, locked }) {
+  return (
+      <section className="tp-synthesis">
+        <h2 className="tp-synthesis__title">Síntese da trilha</h2>
+        <p className="tp-synthesis__hint">
+          {locked
+              ? 'Síntese registrada.'
+              : 'Para concluir a trilha, escreva suas reflexões e conclusões. Não há certo ou errado.'}
+        </p>
+
+        <textarea
+            className="tp-synthesis__input"
+            aria-label="Síntese da trilha"
+            rows={7}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            readOnly={locked}
+            placeholder="O que esta trilha revelou sobre você?"
+        />
+
+        {!locked && (
+            <div className="tp-synthesis__footer">
+              <SaveFeedback status={saveStatus} />
+              <button
+                  type="button"
+                  className="tp-synthesis__btn"
+                  onClick={onSave}
+                  disabled={saveStatus === 'saving' || !value.trim()}
+              >
+                Salvar e concluir trilha
+              </button>
+            </div>
+        )}
+      </section>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────────────
 
 export default function TrailPage() {
@@ -215,6 +261,11 @@ export default function TrailPage() {
   const [saveStatus, setSaveStatus]   = useState({})
   const [answersWarning, setAnswersWarning] = useState('')
 
+  // ── Estados da síntese (RF-11) ─────────────────────────────
+  const [synthesis, setSynthesis]             = useState('')   // texto digitado
+  const [savedSynthesis, setSavedSynthesis]   = useState(null) // objeto vindo do backend
+  const [synthesisStatus, setSynthesisStatus] = useState(null) // 'saving' | 'error' | null
+
   // ── Carregamento inicial ───────────────────────────────────
   useEffect(() => {
     const numericTrailId = Number(trailId)
@@ -228,6 +279,9 @@ export default function TrailPage() {
       setLoadingPage(true)
       setPageError('')
       setAnswersWarning('')
+      setSynthesis('')
+      setSavedSynthesis(null)
+      setSynthesisStatus(null)
 
       let questionsData = []
 
@@ -260,6 +314,21 @@ export default function TrailPage() {
       } catch (answersErr) {
         console.error('[TrailPage] Falha ao carregar histórico de respostas:', answersErr)
         setAnswersWarning(answersErrorMessage(answersErr))
+      }
+
+      // 2.1 Verifica se o aluno já enviou a síntese desta trilha (RF-11)
+      try {
+        const mine = await getMySyntheses()
+        const found = mine.find(
+            (s) => Number(s.trailId ?? s.trail?.id) === numericTrailId
+        )
+        setSavedSynthesis(found ?? null)
+        setSynthesis(found?.content ?? '')
+      } catch (synErr) {
+        console.error('[TrailPage] Falha ao carregar síntese:', synErr)
+        setAnswersWarning((prev) =>
+            prev || 'Não foi possível verificar sua síntese desta trilha.'
+        )
       }
 
       // 3. Monta o mapa se as respostas existirem
@@ -297,6 +366,23 @@ export default function TrailPage() {
       setSaveStatus(prev => ({ ...prev, [questionId]: 'error' }))
     }
   }, [user?.id])
+
+  // ── Salvar síntese (RF-11) ─────────────────────────────────
+
+  const handleSaveSynthesis = useCallback(async () => {
+    setSynthesisStatus('saving')
+    try {
+      const saved = await postSynthesis({
+        content: synthesis,
+        trailId: Number(trailId),
+      })
+      setSavedSynthesis(saved ?? { content: synthesis })
+      setSynthesisStatus(null)
+    } catch (err) {
+      console.error('[TrailPage] Erro ao salvar síntese:', err)
+      setSynthesisStatus('error')
+    }
+  }, [synthesis, trailId])
 
   // ── Cálculo de progresso ───────────────────────────────────
   const totalQuestions   = questions.length
@@ -419,18 +505,33 @@ export default function TrailPage() {
             )
           })}
 
-          {/* ── Banner de conclusão ── */}
+          {/* ── Síntese (RF-11) + banner de conclusão ── */}
           {isComplete && (
-              <div className="tp-done">
-                <div className="tp-done__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="28" height="28">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round"/>
-                    <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <h2>Trilha concluída! 🎉</h2>
-                <p>Você respondeu todas as perguntas. Seus dados foram salvos e seu perfil vocacional está sendo calculado.</p>
-              </div>
+              <>
+                <SynthesisCard
+                    value={synthesis}
+                    onChange={(text) => {
+                      setSynthesis(text)
+                      setSynthesisStatus(null)
+                    }}
+                    onSave={handleSaveSynthesis}
+                    saveStatus={synthesisStatus}
+                    locked={!!savedSynthesis}
+                />
+
+                {savedSynthesis && (
+                    <div className="tp-done">
+                      <div className="tp-done__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="28" height="28">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round"/>
+                          <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <h2>Trilha concluída! 🎉</h2>
+                      <p>Você respondeu todas as perguntas. Seus dados foram salvos e seu perfil vocacional está sendo calculado.</p>
+                    </div>
+                )}
+              </>
           )}
         </main>
       </div>
