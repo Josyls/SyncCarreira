@@ -29,6 +29,7 @@ export default function AppHeader() {
 
   const linkClass = ({ isActive }) =>
     `sc-header__link${isActive ? ' sc-header__link--active' : ''}`
+  const homePath = isPsychologist(user) ? '/painel-progresso' : '/home'
 
   return (
     <header className="sc-header">
@@ -38,7 +39,7 @@ export default function AppHeader() {
       </div>
 
       <nav className="sc-header__nav" aria-label="Navegação principal">
-        <NavLink to="/home" className={linkClass}>Início</NavLink>
+        <NavLink to={homePath} className={linkClass}>Início</NavLink>
         <NavLink to="/agendamentos" className={linkClass}>Agendamentos</NavLink>
         {hasStudentRole(user) && (
           <NavLink to="/perfil" className={linkClass}>Meu perfil</NavLink>
@@ -47,7 +48,9 @@ export default function AppHeader() {
           <NavLink to="/gestao" className={linkClass}>Gestão</NavLink>
         )}
         {isPsychologist(user) && (
-          <NavLink to="/curadoria-links" className={linkClass}>Curadoria de links</NavLink>
+          <>
+            <NavLink to="/curadoria-links" className={linkClass}>Curadoria de links</NavLink>
+          </>
         )}
       </nav>
 

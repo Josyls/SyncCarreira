@@ -12,6 +12,7 @@ import InformationLinkManagementPage from '../pages/Psicologas/InformationLinkMa
 import JourneyResultPage from '../pages/ResultadoJornada/JourneyResultPage.jsx'
 import StudentProfilePage from '../pages/Perfil/StudentProfilePage.jsx'
 import StudentProfileGate from '../pages/Perfil/StudentProfileGate.jsx'
+import ProgressDashboardPage from '../pages/Psicologas/ProgressDashboardPage.jsx'
 import { isAdministrator, isPsychologist } from '../utils/roles.js'
 
 function PrivateRoute({ children }) {
@@ -40,6 +41,13 @@ function PsychologistRoute({ children }) {
         : <Navigate to={user ? "/home" : "/login"} replace />
 }
 
+function HomeRoute() {
+    const { user } = useAuth()
+    return isPsychologist(user)
+        ? <Navigate to="/painel-progresso" replace />
+        : <StudentProfileGate><HomePage /></StudentProfileGate>
+}
+
 function StudentRoute({ children }) {
     const { user } = useAuth()
     const studentRoles = ['ROLE_USER', 'ROLE_STUDENT', 'ROLE_ALUNO']
@@ -56,7 +64,7 @@ export default function AppRoutes() {
             <Route path="/login"    element={<LoginPage />} />
             <Route path="/new-password" element={<NewPasswordPage />} />
             <Route path="/home" element={
-                <PrivateRoute><StudentProfileGate><HomePage /></StudentProfileGate></PrivateRoute>
+                <PrivateRoute><HomeRoute /></PrivateRoute>
             } />
             <Route path="/trail/:trailId" element={
                 <PrivateRoute><StudentProfileGate><TrailPage /></StudentProfileGate></PrivateRoute>
@@ -73,6 +81,9 @@ export default function AppRoutes() {
             } />
             <Route path="/curadoria-links" element={
                 <PrivateRoute><PsychologistRoute><InformationLinkManagementPage /></PsychologistRoute></PrivateRoute>
+            } />
+            <Route path="/painel-progresso" element={
+                <PrivateRoute><PsychologistRoute><ProgressDashboardPage /></PsychologistRoute></PrivateRoute>
             } />
             <Route path="/alunos" element={<Navigate to="/gestao" replace />} />
             <Route path="/alunos/:id" element={

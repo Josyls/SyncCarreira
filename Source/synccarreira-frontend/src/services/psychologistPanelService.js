@@ -6,6 +6,6 @@ export async function getPsychologistPanel(psychologistId) {
     return data
   } catch (error) {
     const message = error.response?.data?.error || error.response?.data?.message
-    throw new Error(message || 'Não foi possível carregar os alunos em dúvida.')
+    throw new Error(message || 'Não foi possível carregar o painel de progresso.')
   }
 }
