@@ -52,6 +52,9 @@ public class SynthesisServiceTests {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private JourneyHistoryService journeyHistoryService;
+
     private Student student;
     private Trail trail, informationTrail;
     private Long nonExistingTrailId;
@@ -125,6 +128,18 @@ public class SynthesisServiceTests {
     }
 
     @Test
+    void insertShouldAskJourneyHistoryToRegisterJourneyWhenSynthesisIsSaved() {
+        mockTrailReadyForSynthesis(informationTrail);
+        Mockito.when(synthesisRepository.existsByStudentIdAndTrailId(student.getId(), informationTrail.getId())).thenReturn(false);
+        Mockito.when(synthesisRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.insert(SynthesisFactory.createSynthesisInsertDTO(informationTrail.getId()));
+
+        // RF-15: o histórico verifica se esta síntese concluiu a jornada
+        Mockito.verify(journeyHistoryService).registerJourneyIfConcluded(student);
+    }
+
+    @Test
     void insertShouldThrowForbiddenExceptionWhenTrailIsNotUnlocked() {
         mockLoggedStudent();
         Mockito.when(trailRepository.findById(trail.getId())).thenReturn(Optional.of(trail));
@@ -155,6 +170,7 @@ public class SynthesisServiceTests {
         Assertions.assertThrows(ConflictException.class,
                 () -> service.insert(dto));
         Mockito.verify(synthesisRepository, Mockito.never()).saveAndFlush(any());
+        Mockito.verify(journeyHistoryService, Mockito.never()).registerJourneyIfConcluded(any());
     }
 
     @Test

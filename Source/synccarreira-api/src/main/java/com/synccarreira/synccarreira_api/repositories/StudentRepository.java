@@ -5,13 +5,16 @@ import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.projections.PanelStudentProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
 
@@ -28,6 +31,13 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             SET fk_id_turma = :classId
             WHERE id_usuario = :studentId""")
     void setSchoolClass(@Param("studentId") Long studentId, @Param("classId") Long classId);
+
+    // Busca o aluno travando a linha dele até o fim da transação (SELECT... FOR ‘UPDATE’).
+    // Usado ao gravar respostas: as gravações de um mesmo aluno passam a acontecer uma de cada vez,
+    // sem bloquear as de outros alunos.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT obj FROM Student obj WHERE obj.id = :id")
+    Optional<Student> findByIdForUpdate(@Param("id") Long id);
 
     // Só marca o aluno que ainda não está em dúvida: retorna 0 quando a dúvida já tinha sido sinalizada
     @Modifying

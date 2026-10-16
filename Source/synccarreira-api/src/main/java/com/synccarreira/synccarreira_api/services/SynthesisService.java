@@ -35,17 +35,21 @@ public class SynthesisService {
 
     private final AuthService authService;
 
+    private final JourneyHistoryService journeyHistoryService;
+
     public SynthesisService(
             final SynthesisRepository synthesisRepository,
             final StudentRepository studentRepository,
             final TrailRepository trailRepository,
             final TrailService trailService,
-            final AuthService authService) {
+            final AuthService authService,
+            final JourneyHistoryService journeyHistoryService) {
         this.synthesisRepository = synthesisRepository;
         this.studentRepository = studentRepository;
         this.trailRepository = trailRepository;
         this.trailService = trailService;
         this.authService = authService;
+        this.journeyHistoryService = journeyHistoryService;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +90,8 @@ public class SynthesisService {
             // Duas requisições simultâneas para a mesma trilha: a restrição única do banco barra a segunda
             throw new ConflictException(ALREADY_SUBMITTED);
         }
+        // RF-15: ao enviar a última síntese, a jornada é concluída e guardada no histórico do aluno
+        journeyHistoryService.registerJourneyIfConcluded(student);
         return new SynthesisDTO(entity);
     }
 

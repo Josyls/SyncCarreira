@@ -25,6 +25,9 @@ public class AnswerRepositoryTests {
     @Autowired
     private AnswerRepository answerRepository;
 
+    @Autowired
+    private StudentRepository studentRepository;
+
     private Student ana, bruno;
     private Question checkboxQuestion, likertQuestion;
     private QuestionOption technology, arts, nature, agree;
@@ -64,23 +67,38 @@ public class AnswerRepositoryTests {
     }
 
     @Test
-    void deleteByStudentAndQuestionShouldDeleteAllAnswersOfStudentToThatQuestionOnly() {
-        int deleted = answerRepository.deleteByStudentAndQuestion(ana.getId(), checkboxQuestion.getId());
-        entityManager.clear();
+    void findByStudentAndQuestionShouldReturnAnswersOfStudentToThatQuestionOrderedById() {
+        List<Answer> result = answerRepository.findByStudentAndQuestion(ana.getId(), checkboxQuestion.getId());
 
-        Assertions.assertEquals(3, deleted);
-        List<Answer> anaAnswers = answerRepository.findByStudentId(ana.getId());
-        Assertions.assertEquals(1, anaAnswers.size());
-        Assertions.assertEquals(agree.getId(), anaAnswers.getFirst().getQuestionOption().getId());
-        // A resposta de outro aluno para a mesma pergunta não é afetada
-        Assertions.assertEquals(1, answerRepository.findByStudentId(bruno.getId()).size());
+        Assertions.assertEquals(3, result.size());
+        Assertions.assertEquals(List.of(technology.getId(), arts.getId(), nature.getId()),
+                result.stream().map(answer -> answer.getQuestionOption().getId()).toList());
+        Assertions.assertTrue(result.getFirst().getId() < result.getLast().getId());
     }
 
     @Test
-    void deleteByStudentAndQuestionShouldDeleteNothingWhenStudentHasNotAnsweredQuestion() {
-        int deleted = answerRepository.deleteByStudentAndQuestion(bruno.getId(), likertQuestion.getId());
+    void findByStudentAndQuestionShouldNotReturnAnswersOfOtherStudentsOrQuestions() {
+        List<Answer> brunoAnswers = answerRepository.findByStudentAndQuestion(bruno.getId(), checkboxQuestion.getId());
+        List<Answer> anaLikert = answerRepository.findByStudentAndQuestion(ana.getId(), likertQuestion.getId());
 
-        Assertions.assertEquals(0, deleted);
+        Assertions.assertEquals(1, brunoAnswers.size());
+        Assertions.assertEquals(technology.getId(), brunoAnswers.getFirst().getQuestionOption().getId());
+        Assertions.assertEquals(1, anaLikert.size());
+        Assertions.assertEquals(agree.getId(), anaLikert.getFirst().getQuestionOption().getId());
+    }
+
+    @Test
+    void findByStudentAndQuestionShouldReturnEmptyWhenStudentHasNotAnsweredQuestion() {
+        Assertions.assertTrue(answerRepository.findByStudentAndQuestion(bruno.getId(), likertQuestion.getId()).isEmpty());
+    }
+
+    @Test
+    void findByIdForUpdateShouldReturnStudentLockingItsRow() {
+        // Confere que a consulta com SELECT ... FOR UPDATE funciona no banco
+        Student result = studentRepository.findByIdForUpdate(ana.getId()).orElseThrow();
+
+        Assertions.assertEquals("Ana", result.getName());
+        Assertions.assertTrue(studentRepository.findByIdForUpdate(9999L).isEmpty());
     }
 
     private Student persistStudent(String name, String email, SchoolClass schoolClass) {

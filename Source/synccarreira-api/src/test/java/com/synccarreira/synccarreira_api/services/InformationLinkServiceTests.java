@@ -4,25 +4,30 @@ import com.synccarreira.synccarreira_api.dto.InformationLinkDTO;
 import com.synccarreira.synccarreira_api.dto.InformationLinkInsertDTO;
 import com.synccarreira.synccarreira_api.dto.InformationTrailDTO;
 import com.synccarreira.synccarreira_api.entities.InformationLink;
+import com.synccarreira.synccarreira_api.entities.Question;
+import com.synccarreira.synccarreira_api.entities.QuestionOption;
 import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.Trail;
 import com.synccarreira.synccarreira_api.entities.enums.KnowledgeArea;
+import com.synccarreira.synccarreira_api.entities.enums.QuestionType;
 import com.synccarreira.synccarreira_api.entities.enums.TrailName;
 import com.synccarreira.synccarreira_api.repositories.InformationLinkRepository;
+import com.synccarreira.synccarreira_api.repositories.QuestionRepository;
 import com.synccarreira.synccarreira_api.repositories.StudentRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
 import com.synccarreira.synccarreira_api.services.exceptions.ForbiddenException;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
 import com.synccarreira.synccarreira_api.tests.StudentFactory;
+import com.synccarreira.synccarreira_api.tests.TrailFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,7 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 @ExtendWith(MockitoExtension.class)
 public class InformationLinkServiceTests {
 
-    @InjectMocks
     private InformationLinkService service;
 
     @Mock
@@ -49,13 +53,20 @@ public class InformationLinkServiceTests {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private QuestionRepository questionRepository;
+
     private Student student;
     private Trail informationTrail;
     private InformationLink biologicalLink, humanitiesLink, prouniLink;
 
     @BeforeEach
     void setUp() {
-        // Na factory, o maior score do aluno é em biológicas
+        // Usa o cálculo real de percentual (RF-12), com as perguntas mockadas
+        service = new InformationLinkService(informationLinkRepository, studentRepository, trailRepository, trailService, authService,
+                new AreaScoreCalculator(questionRepository));
+
+        // Na factory: humanas 7.5, exatas 6.0, biológicas 8.25 e artes 5.0 (maior score bruto: biológicas)
         student = StudentFactory.createStudent();
 
         informationTrail = new Trail();
@@ -68,6 +79,13 @@ public class InformationLinkServiceTests {
         prouniLink = new InformationLink(3L, "ProUni", "https://acessounico.mec.gov.br/prouni", null);
     }
 
+    // Uma pergunta com peso máximo informado para cada área (o máximo possível soma a afinidade máxima, 5)
+    private void mockQuestionWithMaxWeights(double humanities, double biologicalSciences, double exactSciences, double arts) {
+        Question question = new Question(1L, "Pergunta", QuestionType.MULTIPLA_ESCOLHA, TrailFactory.createTrail(), new ArrayList<>());
+        question.getOptions().add(new QuestionOption(1L, "A", humanities, biologicalSciences, exactSciences, arts, question));
+        Mockito.when(questionRepository.findAll()).thenReturn(List.of(question));
+    }
+
     private void mockAccessToInformationTrail(boolean canAccess) {
         Mockito.when(authService.authenticated()).thenReturn(student);
         Mockito.when(studentRepository.findById(student.getId())).thenReturn(Optional.of(student));
@@ -76,8 +94,10 @@ public class InformationLinkServiceTests {
     }
 
     @Test
-    void findForLoggedStudentShouldReturnLinksOfHighestScoreAreaAndUniversityAccessLinks() {
+    void findForLoggedStudentShouldReturnLinksOfHighestPercentageAreaAndUniversityAccessLinks() {
         mockAccessToInformationTrail(true);
+        // Mesmo máximo (15) em todas as áreas: o maior percentual coincide com o maior score bruto
+        mockQuestionWithMaxWeights(10.0, 10.0, 10.0, 10.0);
         Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(List.of(KnowledgeArea.BIOLOGICAS)))
                 .thenReturn(List.of(biologicalLink));
         Mockito.when(informationLinkRepository.findByKnowledgeAreaIsNullOrderByTopicAscIdAsc()).thenReturn(List.of(prouniLink));
@@ -86,6 +106,9 @@ public class InformationLinkServiceTests {
 
         Assertions.assertEquals(List.of(KnowledgeArea.BIOLOGICAS), result.recommendedAreas());
         Assertions.assertEquals(student.getBiologicalSciencesScore(), result.score().biologicalSciencesScore());
+        Assertions.assertEquals(4, result.areaScores().size());
+        Assertions.assertEquals(KnowledgeArea.BIOLOGICAS, result.areaScores().getFirst().area());
+        Assertions.assertEquals(55.0, result.areaScores().getFirst().percentage());
         Assertions.assertEquals(1, result.careerLinks().size());
         Assertions.assertEquals("Educação Física", result.careerLinks().getFirst().topic());
         Assertions.assertEquals(1, result.universityAccessLinks().size());
@@ -97,6 +120,7 @@ public class InformationLinkServiceTests {
     void findForLoggedStudentShouldReturnLinksOfAllTiedAreasWhenScoresAreTied() {
         student.setHumanitiesScore(student.getBiologicalSciencesScore());
         mockAccessToInformationTrail(true);
+        mockQuestionWithMaxWeights(10.0, 10.0, 10.0, 10.0);
         List<KnowledgeArea> tiedAreas = List.of(KnowledgeArea.HUMANAS, KnowledgeArea.BIOLOGICAS);
         Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(tiedAreas))
                 .thenReturn(List.of(humanitiesLink, biologicalLink));
@@ -106,6 +130,41 @@ public class InformationLinkServiceTests {
 
         Assertions.assertEquals(tiedAreas, result.recommendedAreas());
         Assertions.assertEquals(2, result.careerLinks().size());
+    }
+
+    @Test
+    void findForLoggedStudentShouldUsePercentageInsteadOfRawScore() {
+        mockAccessToInformationTrail(true);
+        // Biológicas tem o maior score bruto (8.25), mas o máximo dela é 45: 18,3%. Humanas: 7.5 de 15 = 50%
+        mockQuestionWithMaxWeights(10.0, 40.0, 10.0, 10.0);
+        Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(List.of(KnowledgeArea.HUMANAS)))
+                .thenReturn(List.of(humanitiesLink));
+        Mockito.when(informationLinkRepository.findByKnowledgeAreaIsNullOrderByTopicAscIdAsc()).thenReturn(List.of(prouniLink));
+
+        InformationTrailDTO result = service.findForLoggedStudent();
+
+        Assertions.assertEquals(List.of(KnowledgeArea.HUMANAS), result.recommendedAreas());
+        Assertions.assertEquals("Direito", result.careerLinks().getFirst().topic());
+        Assertions.assertTrue(result.areaScores().getFirst().highlighted());
+    }
+
+    @Test
+    void findForLoggedStudentShouldReturnLinksOfAllAreasWhenStudentHasNoScore() {
+        student.setHumanitiesScore(0.0);
+        student.setExactSciencesScore(0.0);
+        student.setBiologicalSciencesScore(0.0);
+        student.setArtsScore(0.0);
+        mockAccessToInformationTrail(true);
+        mockQuestionWithMaxWeights(10.0, 10.0, 10.0, 10.0);
+        List<KnowledgeArea> allAreas = List.of(KnowledgeArea.values());
+        Mockito.when(informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(allAreas))
+                .thenReturn(List.of(humanitiesLink, biologicalLink));
+        Mockito.when(informationLinkRepository.findByKnowledgeAreaIsNullOrderByTopicAscIdAsc()).thenReturn(List.of(prouniLink));
+
+        InformationTrailDTO result = service.findForLoggedStudent();
+
+        Assertions.assertEquals(allAreas, result.recommendedAreas());
+        Assertions.assertTrue(result.areaScores().stream().noneMatch(score -> score.highlighted()));
     }
 
     @Test

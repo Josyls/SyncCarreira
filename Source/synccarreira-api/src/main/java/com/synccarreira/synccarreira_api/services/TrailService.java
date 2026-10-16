@@ -6,10 +6,12 @@ import com.synccarreira.synccarreira_api.dto.TrailUpdateDTO;
 import com.synccarreira.synccarreira_api.dto.UserDTO;
 import com.synccarreira.synccarreira_api.entities.Answer;
 import com.synccarreira.synccarreira_api.entities.Question;
+import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.Trail;
 import com.synccarreira.synccarreira_api.entities.User;
 import com.synccarreira.synccarreira_api.repositories.AnswerRepository;
 import com.synccarreira.synccarreira_api.repositories.QuestionRepository;
+import com.synccarreira.synccarreira_api.repositories.StudentRepository;
 import com.synccarreira.synccarreira_api.repositories.SynthesisRepository;
 import com.synccarreira.synccarreira_api.repositories.TrailRepository;
 import com.synccarreira.synccarreira_api.services.exceptions.ResourceNotFoundException;
@@ -31,15 +33,19 @@ public class TrailService {
 
     private final SynthesisRepository synthesisRepository;
 
+    private final StudentRepository studentRepository;
+
     public TrailService(
             final TrailRepository trailRepository,
             final UserService userService,
             final AnswerRepository answerRepository,
-            final SynthesisRepository synthesisRepository) {
+            final SynthesisRepository synthesisRepository,
+            final StudentRepository studentRepository) {
         this.trailRepository = trailRepository;
         this.userService = userService;
         this.answerRepository = answerRepository;
         this.synthesisRepository = synthesisRepository;
+        this.studentRepository = studentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +106,8 @@ public class TrailService {
                 .orElseThrow(() -> new ResourceNotFoundException("Trilha não encontrada. ID: " + trailId));
 
         if (trail.getSequentialOrder() == 1) {
-            return true;
+            // RF-14: a jornada só começa depois que o aluno preenche as afinidades do perfil
+            return hasCompletedProfileIfStudent(userService.findMe().getId());
         }
 
         int previousOrder = trail.getSequentialOrder() - 1;
@@ -115,6 +122,13 @@ public class TrailService {
     @Transactional(readOnly = true)
     public boolean areAllQuestionsAnswered(Trail trail, Long studentId) {
         return checkAllQuestionsAnswered(trail, studentId);
+    }
+
+    // Admin e psicóloga não fazem a jornada: o perfil preenchido só é exigido de alunos
+    private boolean hasCompletedProfileIfStudent(Long userId) {
+        return studentRepository.findById(userId)
+                .map(Student::hasCompletedProfile)
+                .orElse(true);
     }
 
     // Uma trilha está concluída quando o aluno respondeu todas as perguntas dela e enviou a síntese

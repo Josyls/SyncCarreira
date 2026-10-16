@@ -4,6 +4,7 @@ import com.synccarreira.synccarreira_api.dto.InformationLinkDTO;
 import com.synccarreira.synccarreira_api.dto.InformationLinkInsertDTO;
 import com.synccarreira.synccarreira_api.dto.InformationTrailDTO;
 import com.synccarreira.synccarreira_api.dto.StudentScoreDTO;
+import com.synccarreira.synccarreira_api.dto.result.AreaScoreDTO;
 import com.synccarreira.synccarreira_api.entities.InformationLink;
 import com.synccarreira.synccarreira_api.entities.Student;
 import com.synccarreira.synccarreira_api.entities.Trail;
@@ -33,17 +34,21 @@ public class InformationLinkService {
 
     private final AuthService authService;
 
+    private final AreaScoreCalculator areaScoreCalculator;
+
     public InformationLinkService(
             final InformationLinkRepository informationLinkRepository,
             final StudentRepository studentRepository,
             final TrailRepository trailRepository,
             final TrailService trailService,
-            final AuthService authService) {
+            final AuthService authService,
+            final AreaScoreCalculator areaScoreCalculator) {
         this.informationLinkRepository = informationLinkRepository;
         this.studentRepository = studentRepository;
         this.trailRepository = trailRepository;
         this.trailService = trailService;
         this.authService = authService;
+        this.areaScoreCalculator = areaScoreCalculator;
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +58,15 @@ public class InformationLinkService {
                 .orElseThrow(() -> new ResourceNotFoundException("Aluno não encontrado. ID: " + user.getId()));
         validateInformationTrailAccess();
 
-        List<KnowledgeArea> recommendedAreas = student.highestScoreAreas();
+        // Mesma lógica do resultado da jornada (RF-12): maior percentual do máximo possível, e não o maior score bruto
+        List<AreaScoreDTO> areaScores = areaScoreCalculator.calculate(
+                student.getHumanitiesScore(),
+                student.getBiologicalSciencesScore(),
+                student.getExactSciencesScore(),
+                student.getArtsScore());
+        List<KnowledgeArea> highlightedAreas = AreaScoreCalculator.highlightedAreas(areaScores);
+        // Sem nenhuma pontuação não há área em destaque: mostra os links de todas as áreas, como antes
+        List<KnowledgeArea> recommendedAreas = highlightedAreas.isEmpty() ? List.of(KnowledgeArea.values()) : highlightedAreas;
         List<InformationLinkDTO> careerLinks = informationLinkRepository.findByKnowledgeAreaInOrderByTopicAscIdAsc(recommendedAreas)
                 .stream()
                 .map(InformationLinkDTO::new)
@@ -63,7 +76,7 @@ public class InformationLinkService {
                 .map(InformationLinkDTO::new)
                 .toList();
 
-        return new InformationTrailDTO(recommendedAreas, new StudentScoreDTO(student), careerLinks, universityAccessLinks);
+        return new InformationTrailDTO(recommendedAreas, new StudentScoreDTO(student), areaScores, careerLinks, universityAccessLinks);
     }
 
     @Transactional(readOnly = true)

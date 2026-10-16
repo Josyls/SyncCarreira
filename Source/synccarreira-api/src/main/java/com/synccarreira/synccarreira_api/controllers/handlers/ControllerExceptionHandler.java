@@ -6,6 +6,7 @@ import com.synccarreira.synccarreira_api.services.exceptions.*;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -14,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import tools.jackson.databind.DatabindException;
 
 import java.time.Instant;
 
@@ -65,10 +67,26 @@ public class ControllerExceptionHandler {
 		return ResponseEntity.status(status).body(err);
 	}
 
+	// Corpo ausente ou JSON com sintaxe inválida é erro na forma da requisição (400).
+	// JSON válido com valor incompatível (ex.: opção inexistente de um enum, texto em campo numérico) é 422,
+	// como as demais validações de campo. A mensagem é genérica para não expor detalhes internos do Jackson.
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	public ResponseEntity<CustomError> methodArgumentNotValid(HttpMessageNotReadableException e, HttpServletRequest request) {
-		HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
-		CustomError err = new CustomError(Instant.now(), status.value(), e.getMessage(), request.getRequestURI());
+	public ResponseEntity<CustomError> httpMessageNotReadable(HttpMessageNotReadableException e, HttpServletRequest request) {
+		boolean invalidValue = e.getMostSpecificCause() instanceof DatabindException;
+		HttpStatus status = invalidValue ? HttpStatus.UNPROCESSABLE_CONTENT : HttpStatus.BAD_REQUEST;
+		String message = invalidValue
+				? "Valor inválido em um ou mais campos da requisição."
+				: "Corpo da requisição ausente ou com JSON malformado.";
+		CustomError err = new CustomError(Instant.now(), status.value(), message, request.getRequestURI());
+		return ResponseEntity.status(status).body(err);
+	}
+
+	// Transação derrubada pelo banco por bloqueio (deadlock ou espera excessiva) mesmo depois das novas tentativas
+	@ExceptionHandler(PessimisticLockingFailureException.class)
+	public ResponseEntity<CustomError> pessimisticLockingFailure(PessimisticLockingFailureException e, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.CONFLICT;
+		CustomError err = new CustomError(Instant.now(), status.value(),
+				"Os dados estavam sendo alterados por outra operação ao mesmo tempo. Tente novamente.", request.getRequestURI());
 		return ResponseEntity.status(status).body(err);
 	}
 
