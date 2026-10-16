@@ -10,6 +10,8 @@ import StudentFormPage from '../pages/Psicologas/studentformPage.jsx'
 import AgendamentosPage from '../pages/Agendamentos/AgendamentosPage.jsx'
 import InformationLinkManagementPage from '../pages/Psicologas/InformationLinkManagementPage.jsx'
 import JourneyResultPage from '../pages/ResultadoJornada/JourneyResultPage.jsx'
+import StudentProfilePage from '../pages/Perfil/StudentProfilePage.jsx'
+import StudentProfileGate from '../pages/Perfil/StudentProfileGate.jsx'
 import { isAdministrator, isPsychologist } from '../utils/roles.js'
 
 function PrivateRoute({ children }) {
@@ -54,13 +56,16 @@ export default function AppRoutes() {
             <Route path="/login"    element={<LoginPage />} />
             <Route path="/new-password" element={<NewPasswordPage />} />
             <Route path="/home" element={
-                <PrivateRoute><HomePage /></PrivateRoute>
+                <PrivateRoute><StudentProfileGate><HomePage /></StudentProfileGate></PrivateRoute>
             } />
             <Route path="/trail/:trailId" element={
-                <PrivateRoute><TrailPage /></PrivateRoute>
+                <PrivateRoute><StudentProfileGate><TrailPage /></StudentProfileGate></PrivateRoute>
+            } />
+            <Route path="/perfil" element={
+                <PrivateRoute><StudentRoute><StudentProfilePage /></StudentRoute></PrivateRoute>
             } />
             <Route path="/resultado-jornada" element={
-                <PrivateRoute><StudentRoute><JourneyResultPage /></StudentRoute></PrivateRoute>
+                <PrivateRoute><StudentRoute><StudentProfileGate><JourneyResultPage /></StudentProfileGate></StudentRoute></PrivateRoute>
             } />
 
             <Route path="/gestao" element={
