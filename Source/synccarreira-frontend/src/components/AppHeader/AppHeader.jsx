@@ -9,7 +9,7 @@
 
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { isAdministrator } from '../../utils/roles.js'
+import { isAdministrator, isPsychologist } from '../../utils/roles.js'
 import './AppHeader.css'
 
 export default function AppHeader() {
@@ -36,6 +36,9 @@ export default function AppHeader() {
         <NavLink to="/agendamentos" className={linkClass}>Agendamentos</NavLink>
         {isAdministrator(user) && (
           <NavLink to="/gestao" className={linkClass}>Gestão</NavLink>
+        )}
+        {isPsychologist(user) && (
+          <NavLink to="/curadoria-links" className={linkClass}>Curadoria de links</NavLink>
         )}
       </nav>
 

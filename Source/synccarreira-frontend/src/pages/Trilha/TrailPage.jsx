@@ -22,6 +22,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { getStudentInformationTrail } from '../../services/informationLinkService.js'
 import {
   getTrailById,
   canAccessTrail,
@@ -253,6 +254,82 @@ function SynthesisCard({ value, onChange, onSave, saveStatus, locked, finalJourn
   )
 }
 
+const KNOWLEDGE_AREA_LABELS = {
+  HUMANAS: 'Ciências Humanas',
+  BIOLOGICAS: 'Ciências Biológicas',
+  EXATAS: 'Ciências Exatas',
+  ARTES: 'Artes',
+}
+
+function InformationLinks({ data, loading, error }) {
+  if (loading) {
+    return <section className="tp-info-links"><p>Carregando materiais complementares…</p></section>
+  }
+
+  if (error) {
+    return (
+      <section className="tp-info-links tp-info-links--error" role="status">
+        <h2>Materiais complementares</h2>
+        <p>{error} Você ainda pode registrar sua síntese final.</p>
+      </section>
+    )
+  }
+
+  const careerLinks = data?.careerLinks ?? []
+  const universityLinks = data?.universityAccessLinks ?? []
+  const recommendedAreas = data?.recommendedAreas ?? []
+  const hasLinks = careerLinks.length > 0 || universityLinks.length > 0
+
+  return (
+    <section className="tp-info-links" aria-labelledby="tp-info-links-title">
+      <div className="tp-info-links__heading">
+        <div>
+          <span className="tp-info-links__eyebrow">Opcional</span>
+          <h2 id="tp-info-links-title">Materiais para explorar</h2>
+        </div>
+        <p>Consulte as fontes se quiser aprofundar sua pesquisa. Elas não são necessárias para concluir a trilha.</p>
+      </div>
+
+      {careerLinks.length > 0 && (
+        <div className="tp-info-links__group">
+          <h3>Carreiras e áreas de interesse</h3>
+          {recommendedAreas.length > 0 && (
+            <p className="tp-info-links__caption">
+              Sugestões relacionadas a {recommendedAreas.map(area => KNOWLEDGE_AREA_LABELS[area] ?? area).join(', ')}.
+            </p>
+          )}
+          <ul>
+            {careerLinks.map(link => (
+              <li key={link.id}>
+                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                  <span>{link.topic}</span><span aria-hidden="true">↗</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {universityLinks.length > 0 && (
+        <div className="tp-info-links__group">
+          <h3>Acesso à universidade</h3>
+          <ul>
+            {universityLinks.map(link => (
+              <li key={link.id}>
+                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                  <span>{link.topic}</span><span aria-hidden="true">↗</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!hasLinks && <p className="tp-info-links__empty">Ainda não há materiais cadastrados. Você pode continuar e salvar sua síntese.</p>}
+    </section>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────────────
 
 export default function TrailPage() {
@@ -264,6 +341,9 @@ export default function TrailPage() {
   const [trail, setTrail]         = useState(null)
   const [questions, setQuestions] = useState([])
   const [answers, setAnswers]     = useState({})
+  const [informationData, setInformationData] = useState(null)
+  const [informationLinksLoading, setInformationLinksLoading] = useState(false)
+  const [informationLinksError, setInformationLinksError] = useState('')
 
   // ── Estados de UI ──────────────────────────────────────────
   const [loadingPage, setLoadingPage] = useState(true)
@@ -292,6 +372,9 @@ export default function TrailPage() {
       setSynthesis('')
       setSavedSynthesis(null)
       setSynthesisStatus(null)
+      setInformationData(null)
+      setInformationLinksError('')
+      setInformationLinksLoading(false)
 
       let questionsData = []
 
@@ -315,6 +398,22 @@ export default function TrailPage() {
         questionsData = questionsRes ?? []
         const numbered = questionsData.map((q, i) => ({ ...q, index: i + 1 }))
         setQuestions(numbered)
+
+        const normalizedTrailName = trailData.name
+            ?.normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase()
+        if (normalizedTrailName === 'INFORMACAO') {
+          setInformationLinksLoading(true)
+          try {
+            setInformationData(await getStudentInformationTrail())
+          } catch (linksError) {
+            console.error('[TrailPage] Falha ao carregar materiais da trilha de Informação:', linksError)
+            setInformationLinksError('Não foi possível carregar os links agora.')
+          } finally {
+            setInformationLinksLoading(false)
+          }
+        }
 
       } catch (err) {
         console.error('[TrailPage] Erro crítico ao carregar trilha/perguntas:', err)
@@ -526,6 +625,14 @@ export default function TrailPage() {
                 />
             )
           })}
+
+          {isJourneySynthesis && (
+            <InformationLinks
+              data={informationData}
+              loading={informationLinksLoading}
+              error={informationLinksError}
+            />
+          )}
 
           {/* ── Síntese (RF-11) + banner de conclusão ── */}
           {canShowSynthesis && (

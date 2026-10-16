@@ -8,6 +8,7 @@ import AccountManagementPage from '../pages/Psicologas/AccountManagementPage.jsx
 import StudentDetailPage from '../pages/Psicologas/studentdetailPage.jsx'
 import StudentFormPage from '../pages/Psicologas/studentformPage.jsx'
 import AgendamentosPage from '../pages/Agendamentos/AgendamentosPage.jsx'
+import InformationLinkManagementPage from '../pages/Psicologas/InformationLinkManagementPage.jsx'
 import { isAdministrator, isPsychologist } from '../utils/roles.js'
 
 function PrivateRoute({ children }) {
@@ -29,6 +30,13 @@ function AdminRoute({ children }) {
         : <Navigate to={user ? "/home" : "/login"} replace />
 }
 
+function PsychologistRoute({ children }) {
+    const { user } = useAuth()
+    return user && isPsychologist(user)
+        ? children
+        : <Navigate to={user ? "/home" : "/login"} replace />
+}
+
 export default function AppRoutes() {
     return (
         <Routes>
@@ -43,6 +51,9 @@ export default function AppRoutes() {
 
             <Route path="/gestao" element={
                 <AdminRoute><AccountManagementPage /></AdminRoute>
+            } />
+            <Route path="/curadoria-links" element={
+                <PrivateRoute><PsychologistRoute><InformationLinkManagementPage /></PsychologistRoute></PrivateRoute>
             } />
             <Route path="/alunos" element={<Navigate to="/gestao" replace />} />
             <Route path="/alunos/:id" element={

@@ -109,6 +109,35 @@
   line-height: 1.5;
 }
 
+/* ── Materiais opcionais da trilha Informação (RF-06) ─────── */
+.tp-info-links {
+  padding: 22px 24px;
+  border: 1px solid #d9d3f5;
+  border-radius: var(--sc-radius-lg);
+  background: linear-gradient(145deg, #fff 0%, #faf8ff 100%);
+  box-shadow: var(--sc-shadow);
+}
+
+.tp-info-links__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.tp-info-links__heading h2 { margin: 3px 0 0; color: var(--sc-text); font-size: 17px; }
+.tp-info-links__heading > p { max-width: 310px; margin: 0; color: var(--sc-muted); font-size: 12px; line-height: 1.5; }
+.tp-info-links__eyebrow { color: var(--sc-roxo); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.tp-info-links__group { margin-top: 20px; }
+.tp-info-links__group h3 { margin: 0; color: var(--sc-text); font-size: 13px; }
+.tp-info-links__caption { margin: 5px 0 0; color: var(--sc-muted); font-size: 11px; }
+.tp-info-links__group ul { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.tp-info-links__group li a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--sc-border); border-radius: var(--sc-radius-md); background: var(--sc-white); color: var(--sc-roxo); font-size: 13px; font-weight: 600; text-decoration: none; transition: border-color .15s, transform .15s; }
+.tp-info-links__group li a:hover { border-color: var(--sc-roxo); transform: translateY(-1px); }
+.tp-info-links__empty, .tp-info-links--error > p { margin: 16px 0 0; color: var(--sc-muted); font-size: 13px; line-height: 1.5; }
+.tp-info-links--error { border-color: #f0d3a2; background: #fffaf0; }
+.tp-info-links--error h2 { margin: 0; color: var(--sc-text); font-size: 16px; }
+
 /* ── Hero da trilha ────────────────────────────────────────── */
 .tp-hero {
   background: var(--sc-white);
@@ -621,6 +650,8 @@
 @media (max-width: 600px) {
   .tp-synthesis { padding: 18px 16px; }
   .tp-synthesis--journey { padding: 20px 16px; }
+  .tp-info-links { padding: 18px 16px; }
+  .tp-info-links__heading { flex-direction: column; }
   .tp-main { padding: 20px 16px 48px; }
   .tp-hero { flex-direction: column; align-items: flex-start; }
   .tp-hero__stats { margin-left: 0; align-items: flex-start; }
