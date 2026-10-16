@@ -5,8 +5,10 @@ import {
     assignStudentToClass,
     createManagedClass,
     listActiveInstitutions,
+    listManagedInstitutions,
     listManagedClasses,
     listManagedAccounts,
+    saveManagedInstitution,
     saveManagedAccount,
 } from '../../services/accountManagementService.js'
 import './studentlistPage.css'
@@ -14,6 +16,12 @@ import './studentlistPage.css'
 const EMPTY_STUDENT = { name: '', email: '', schollarYear: '', schoolType: '' }
 const EMPTY_PSYCHOLOGIST = { name: '', email: '', crp: '', contractExpirationDate: '', institutionId: '' }
 const EMPTY_CLASS = { name: '', schoolYear: '', institutionId: '' }
+const EMPTY_INSTITUTION = { legalName: '', tradeName: '', cnpj: '', type: 'PUBLICA', active: true }
+const INSTITUTION_TYPES = [
+    { id: 'PUBLICA', label: 'Pública' },
+    { id: 'PARTICULAR', label: 'Particular' },
+    { id: 'ONG', label: 'ONG' },
+]
 const SCHOOL_YEARS = [
     '1º Ano - Ensino Médio',
     '2º Ano - Ensino Médio',
@@ -50,6 +58,7 @@ export default function AccountManagementPage() {
     const [loading, setLoading] = useState(true)
     const [loadingClasses, setLoadingClasses] = useState(false)
     const [loadingInstitutions, setLoadingInstitutions] = useState(false)
+    const [loadingInstitutionList, setLoadingInstitutionList] = useState(false)
     const [saving, setSaving] = useState(false)
     const [deletingId, setDeletingId] = useState(null)
     const [error, setError] = useState('')
@@ -59,11 +68,15 @@ export default function AccountManagementPage() {
     const [modalOpen, setModalOpen] = useState(false)
     const [classModalOpen, setClassModalOpen] = useState(false)
     const [classForm, setClassForm] = useState(EMPTY_CLASS)
+    const [institutionModalOpen, setInstitutionModalOpen] = useState(false)
+    const [institutionForm, setInstitutionForm] = useState(EMPTY_INSTITUTION)
+    const [editingInstitutionId, setEditingInstitutionId] = useState(null)
     const [assignmentModalOpen, setAssignmentModalOpen] = useState(false)
     const [assignmentStudent, setAssignmentStudent] = useState(null)
     const [assignmentClassId, setAssignmentClassId] = useState('')
 
     useEffect(() => {
+        if (managementView !== 'usuarios') return
         let current = true
         setLoading(true)
         setError('')
@@ -78,7 +91,7 @@ export default function AccountManagementPage() {
             })
             .finally(() => { if (current) setLoading(false) })
         return () => { current = false }
-    }, [profile])
+    }, [profile, managementView])
 
     useEffect(() => {
         if (managementView !== 'turmas') return
@@ -91,6 +104,20 @@ export default function AccountManagementPage() {
                 if (current) setError(accountRequestError(err, 'Não foi possível consultar as turmas.'))
             })
             .finally(() => { if (current) setLoadingClasses(false) })
+        return () => { current = false }
+    }, [managementView])
+
+    useEffect(() => {
+        if (managementView !== 'instituicoes') return
+        let current = true
+        setLoadingInstitutionList(true)
+        listManagedInstitutions()
+            .then(data => { if (current) setInstitutions(data) })
+            .catch(err => {
+                console.error('Erro ao carregar instituições:', err)
+                if (current) setError(accountRequestError(err, 'Não foi possível carregar as instituições.'))
+            })
+            .finally(() => { if (current) setLoadingInstitutionList(false) })
         return () => { current = false }
     }, [managementView])
 
@@ -121,6 +148,14 @@ export default function AccountManagementPage() {
             !term || `${schoolClass.name} ${schoolClass.institutionName ?? ''}`.toLocaleLowerCase('pt-BR').includes(term)
         )
     }, [classes, search])
+
+    const filteredInstitutions = useMemo(() => {
+        const term = search.trim().toLocaleLowerCase('pt-BR')
+        return institutions.filter(institution =>
+            !term || `${institution.legalName} ${institution.tradeName ?? ''} ${institution.cnpj ?? ''} ${institution.type}`
+                .toLocaleLowerCase('pt-BR').includes(term)
+        )
+    }, [institutions, search])
 
     function openCreate() {
         setEditingId(null)
@@ -213,6 +248,60 @@ export default function AccountManagementPage() {
         }
     }
 
+    function openInstitutionCreate() {
+        setEditingInstitutionId(null)
+        setInstitutionForm(EMPTY_INSTITUTION)
+        setError('')
+        setInstitutionModalOpen(true)
+    }
+
+    function openInstitutionEdit(institution) {
+        setEditingInstitutionId(institution.id)
+        setInstitutionForm({
+            legalName: institution.legalName ?? '',
+            tradeName: institution.tradeName ?? '',
+            cnpj: institution.cnpj ?? '',
+            type: institution.type ?? 'PUBLICA',
+            active: institution.active,
+        })
+        setError('')
+        setInstitutionModalOpen(true)
+    }
+
+    async function handleInstitutionSubmit(event) {
+        event.preventDefault()
+        setSaving(true)
+        setError('')
+        try {
+            const saved = await saveManagedInstitution(institutionForm, editingInstitutionId)
+            setInstitutions(current => editingInstitutionId
+                ? current.map(item => item.id === editingInstitutionId ? saved : item)
+                : [...current, saved].sort((a, b) => a.legalName.localeCompare(b.legalName, 'pt-BR')))
+            setInstitutionModalOpen(false)
+        } catch (err) {
+            console.error('Erro ao salvar instituição:', err)
+            setError(err.response?.data?.message || err.response?.data?.error || accountRequestError(err, 'Não foi possível salvar a instituição. Verifique o CNPJ e tente novamente.'))
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleInstitutionStatus(institution) {
+        const action = institution.active ? 'desativar' : 'ativar'
+        if (!window.confirm(`Deseja ${action} a instituição ${institution.tradeName || institution.legalName}?`)) return
+        setDeletingId(institution.id)
+        setError('')
+        try {
+            const updated = await saveManagedInstitution({ ...institution, active: !institution.active }, institution.id)
+            setInstitutions(current => current.map(item => item.id === institution.id ? updated : item))
+        } catch (err) {
+            console.error(`Erro ao ${action} instituição:`, err)
+            setError(err.response?.data?.message || err.response?.data?.error || accountRequestError(err, `Não foi possível ${action} a instituição.`))
+        } finally {
+            setDeletingId(null)
+        }
+    }
+
     async function openStudentAssignment(student) {
         setAssignmentStudent(student)
         setAssignmentClassId('')
@@ -257,19 +346,21 @@ export default function AccountManagementPage() {
                 <div className="students-heading">
                     <div>
                         <p className="students-eyebrow">GESTÃO DE ACESSO</p>
-                        <h1>{managementView === 'usuarios' ? 'Usuários' : 'Turmas'}</h1>
+                        <h1>{managementView === 'usuarios' ? 'Usuários' : managementView === 'turmas' ? 'Turmas' : 'Instituições'}</h1>
                         <p className="students-description">
                             {managementView === 'usuarios'
-                                ? 'Cadastros de alunos e psicólogas conectados à API.'
-                                : 'Turmas vinculadas às instituições cadastradas.'}
+                                ? 'Gerencie os cadastros de alunos e psicólogas.'
+                                : managementView === 'turmas'
+                                    ? 'Turmas vinculadas às instituições cadastradas.'
+                                    : 'Cadastre e gerencie escolas e organizações parceiras.'}
                         </p>
                     </div>
                     <button
                         className="students-primary"
                         type="button"
-                        onClick={managementView === 'usuarios' ? openCreate : openClassCreate}
+                        onClick={managementView === 'usuarios' ? openCreate : managementView === 'turmas' ? openClassCreate : openInstitutionCreate}
                     >
-                        <span aria-hidden="true">+</span> {managementView === 'usuarios' ? 'Novo cadastro' : 'Nova turma'}
+                        <span aria-hidden="true">+</span> {managementView === 'usuarios' ? 'Novo cadastro' : managementView === 'turmas' ? 'Nova turma' : 'Nova instituição'}
                     </button>
                 </div>
 
@@ -294,6 +385,14 @@ export default function AccountManagementPage() {
                     >
                         Turmas
                     </button>
+                    <button
+                        type="button"
+                        className={managementView === 'instituicoes' ? 'is-selected' : ''}
+                        aria-pressed={managementView === 'instituicoes'}
+                        onClick={() => { setManagementView('instituicoes'); setSearch(''); setError('') }}
+                    >
+                        Instituições
+                    </button>
                 </div>
 
                 {managementView === 'usuarios' && (
@@ -317,26 +416,25 @@ export default function AccountManagementPage() {
                 )}
 
                 <section className="students-summary" aria-label="Resumo dos cadastros">
-                    <div><span>{managementView === 'usuarios' ? 'Cadastros encontrados' : 'Turmas cadastradas'}</span><strong>{managementView === 'usuarios' ? accounts.length : classes.length}</strong></div>
-                    <div><span>{managementView === 'usuarios' ? 'Perfil selecionado' : 'Ano escolar'}</span><strong>{managementView === 'usuarios' ? (profile === 'aluno' ? 'Aluno' : 'Psicóloga') : 'Por turma'}</strong></div>
-                    <div><span>Fonte</span><strong>API</strong></div>
+                    <div><span>{managementView === 'usuarios' ? 'Cadastros encontrados' : managementView === 'turmas' ? 'Turmas cadastradas' : 'Instituições cadastradas'}</span><strong>{managementView === 'usuarios' ? accounts.length : managementView === 'turmas' ? classes.length : institutions.length}</strong></div>
+                    <div><span>{managementView === 'usuarios' ? 'Perfil selecionado' : managementView === 'turmas' ? 'Ano escolar' : 'Instituições ativas'}</span><strong>{managementView === 'usuarios' ? (profile === 'aluno' ? 'Aluno' : 'Psicóloga') : managementView === 'turmas' ? 'Por turma' : institutions.filter(item => item.active).length}</strong></div>
                 </section>
 
                 {error && <p className="students-error" role="alert">{error}</p>}
 
-                <section className="students-tools" aria-label={managementView === 'usuarios' ? 'Busca de usuários' : 'Busca de turmas'}>
+                <section className="students-tools" aria-label={managementView === 'usuarios' ? 'Busca de usuários' : managementView === 'turmas' ? 'Busca de turmas' : 'Busca de instituições'}>
                     <label className="students-search">
-                        <span className="sr-only">Buscar usuário</span>
+                        <span className="sr-only">{managementView === 'usuarios' ? 'Buscar usuário' : managementView === 'turmas' ? 'Buscar turma' : 'Buscar instituição'}</span>
                         <input
                             type="search"
                             value={search}
                             onChange={event => setSearch(event.target.value)}
-                            placeholder={managementView === 'usuarios' ? 'Buscar por nome, e-mail ou CRP' : 'Buscar por turma ou instituição'}
+                            placeholder={managementView === 'usuarios' ? 'Buscar por nome, e-mail ou CRP' : managementView === 'turmas' ? 'Buscar por turma ou instituição' : 'Buscar por nome, CNPJ ou tipo'}
                         />
                     </label>
                 </section>
 
-                <section className="students-table-wrap" aria-label={managementView === 'usuarios' ? 'Lista de usuários' : 'Lista de turmas'}>
+                <section className="students-table-wrap" aria-label={managementView === 'usuarios' ? 'Lista de usuários' : managementView === 'turmas' ? 'Lista de turmas' : 'Lista de instituições'}>
                     {managementView === 'usuarios' ? (
                         loading ? <p className="students-empty">Consultando a API...</p> : (
                             <>
@@ -392,7 +490,7 @@ export default function AccountManagementPage() {
                                 )}
                             </>
                         )
-                    ) : (
+                    ) : managementView === 'turmas' ? (
                         loadingClasses ? <p className="students-empty">Consultando turmas...</p> : (
                             <>
                                 <table className="students-table">
@@ -414,12 +512,38 @@ export default function AccountManagementPage() {
                                 )}
                             </>
                         )
+                    ) : loadingInstitutionList ? <p className="students-empty">Consultando instituições...</p> : (
+                        <>
+                            <table className="students-table">
+                                <thead><tr><th>Instituição</th><th>CNPJ</th><th>Tipo</th><th>Turmas</th><th>Status</th><th><span className="sr-only">Ações</span></th></tr></thead>
+                                <tbody>
+                                    {filteredInstitutions.map(institution => (
+                                        <tr key={institution.id}>
+                                            <td><strong>{institution.tradeName || institution.legalName}</strong>{institution.tradeName && <span>{institution.legalName}</span>}</td>
+                                            <td>{institution.cnpj}</td>
+                                            <td>{INSTITUTION_TYPES.find(type => type.id === institution.type)?.label ?? institution.type}</td>
+                                            <td>{institution.classCount ?? 0}</td>
+                                            <td><span className={`students-status${institution.active ? '' : ' students-status--inactive'}`}>{institution.active ? 'Ativa' : 'Inativa'}</span></td>
+                                            <td className="students-actions">
+                                                <button type="button" onClick={() => openInstitutionEdit(institution)}>Editar</button>
+                                                <button type="button" disabled={deletingId === institution.id} onClick={() => handleInstitutionStatus(institution)}>
+                                                    {deletingId === institution.id ? 'Salvando...' : institution.active ? 'Desativar' : 'Ativar'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {filteredInstitutions.length === 0 && <p className="students-empty">{institutions.length ? 'Nenhuma instituição corresponde à busca.' : 'Nenhuma instituição cadastrada.'}</p>}
+                        </>
                     )}
                 </section>
                 <p className="students-count">
                     {managementView === 'usuarios'
                         ? `${filteredAccounts.length} ${filteredAccounts.length === 1 ? 'cadastro' : 'cadastros'}`
-                        : `${filteredClasses.length} ${filteredClasses.length === 1 ? 'turma' : 'turmas'}`}
+                        : managementView === 'turmas'
+                            ? `${filteredClasses.length} ${filteredClasses.length === 1 ? 'turma' : 'turmas'}`
+                            : `${filteredInstitutions.length} ${filteredInstitutions.length === 1 ? 'instituição' : 'instituições'}`}
                 </p>
             </main>
 
@@ -578,6 +702,53 @@ export default function AccountManagementPage() {
                                 <button className="students-secondary" type="button" onClick={() => setAssignmentModalOpen(false)}>Cancelar</button>
                                 <button className="students-primary" type="submit" disabled={saving || loadingClasses || classes.length === 0}>
                                     {saving ? 'Associando...' : 'Associar à turma'}
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+            )}
+
+            {institutionModalOpen && (
+                <div className="students-modal-backdrop" onMouseDown={event => {
+                    if (event.target === event.currentTarget) setInstitutionModalOpen(false)
+                }}>
+                    <section className="students-modal" role="dialog" aria-modal="true" aria-labelledby="institution-modal-title">
+                        <div className="students-modal-heading">
+                            <div>
+                                <p className="students-eyebrow">GESTÃO DE INSTITUIÇÕES</p>
+                                <h2 id="institution-modal-title">{editingInstitutionId ? 'Editar instituição' : 'Nova instituição'}</h2>
+                            </div>
+                            <button className="students-close" type="button" aria-label="Fechar" onClick={() => setInstitutionModalOpen(false)}>×</button>
+                        </div>
+                        <form onSubmit={handleInstitutionSubmit}>
+                            {error && <p className="students-error" role="alert">{error}</p>}
+                            <label>Razão social
+                                <input autoFocus required value={institutionForm.legalName} onChange={event => setInstitutionForm(current => ({ ...current, legalName: event.target.value }))} />
+                            </label>
+                            <label>Nome fantasia
+                                <input value={institutionForm.tradeName} onChange={event => setInstitutionForm(current => ({ ...current, tradeName: event.target.value }))} />
+                            </label>
+                            <div className="students-form-row">
+                                <label>CNPJ
+                                    <input required inputMode="numeric" placeholder="00.000.000/0000-00" value={institutionForm.cnpj} onChange={event => setInstitutionForm(current => ({ ...current, cnpj: event.target.value }))} />
+                                </label>
+                                <label>Tipo de instituição
+                                    <select required value={institutionForm.type} onChange={event => setInstitutionForm(current => ({ ...current, type: event.target.value }))}>
+                                        {INSTITUTION_TYPES.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+                            {editingInstitutionId && (
+                                <label className="institution-active-toggle">
+                                    <input type="checkbox" checked={institutionForm.active} onChange={event => setInstitutionForm(current => ({ ...current, active: event.target.checked }))} />
+                                    Instituição ativa
+                                </label>
+                            )}
+                            <div className="students-modal-actions">
+                                <button className="students-secondary" type="button" onClick={() => setInstitutionModalOpen(false)}>Cancelar</button>
+                                <button className="students-primary" type="submit" disabled={saving}>
+                                    {saving ? 'Salvando...' : editingInstitutionId ? 'Salvar alterações' : 'Cadastrar instituição'}
                                 </button>
                             </div>
                         </form>

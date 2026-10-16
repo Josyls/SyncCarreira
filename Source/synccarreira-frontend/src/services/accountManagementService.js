@@ -25,6 +25,25 @@ export async function listActiveInstitutions() {
   return data.filter(institution => institution.active)
 }
 
+export async function listManagedInstitutions() {
+  const { data } = await api.get('/institutions', { suppressAuthRedirect: true })
+  return data
+}
+
+export async function saveManagedInstitution(institution, id) {
+  const payload = {
+    legalName: institution.legalName.trim(),
+    tradeName: institution.tradeName.trim(),
+    cnpj: institution.cnpj.trim(),
+    type: institution.type,
+    ...(id ? { active: institution.active } : {}),
+  }
+  const response = id
+    ? await api.put(`/institutions/${id}`, payload, { suppressAuthRedirect: true })
+    : await api.post('/institutions', payload, { suppressAuthRedirect: true })
+  return response.data
+}
+
 export async function saveManagedAccount(profile, account, id) {
   const payload = profile === 'aluno'
     ? {
