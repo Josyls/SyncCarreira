@@ -13,6 +13,7 @@ import JourneyResultPage from '../pages/ResultadoJornada/JourneyResultPage.jsx'
 import StudentProfilePage from '../pages/Perfil/StudentProfilePage.jsx'
 import StudentProfileGate from '../pages/Perfil/StudentProfileGate.jsx'
 import ProgressDashboardPage from '../pages/Psicologas/ProgressDashboardPage.jsx'
+import JourneyPanoramaPage from '../pages/Jornada/JourneyPanoramaPage.jsx'
 import { isAdministrator, isPsychologist } from '../utils/roles.js'
 
 function PrivateRoute({ children }) {
@@ -71,6 +72,9 @@ export default function AppRoutes() {
             } />
             <Route path="/perfil" element={
                 <PrivateRoute><StudentRoute><StudentProfilePage /></StudentRoute></PrivateRoute>
+            } />
+            <Route path="/minha-jornada" element={
+                <PrivateRoute><StudentRoute><StudentProfileGate><JourneyPanoramaPage /></StudentProfileGate></StudentRoute></PrivateRoute>
             } />
             <Route path="/resultado-jornada" element={
                 <PrivateRoute><StudentRoute><StudentProfileGate><JourneyResultPage /></StudentProfileGate></StudentRoute></PrivateRoute>

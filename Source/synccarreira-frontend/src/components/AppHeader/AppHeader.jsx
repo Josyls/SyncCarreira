@@ -42,7 +42,10 @@ export default function AppHeader() {
         <NavLink to={homePath} className={linkClass}>Início</NavLink>
         <NavLink to="/agendamentos" className={linkClass}>Agendamentos</NavLink>
         {hasStudentRole(user) && (
-          <NavLink to="/perfil" className={linkClass}>Meu perfil</NavLink>
+          <>
+            <NavLink to="/minha-jornada" className={linkClass}>Minha jornada</NavLink>
+            <NavLink to="/perfil" className={linkClass}>Meu perfil</NavLink>
+          </>
         )}
         {isAdministrator(user) && (
           <NavLink to="/gestao" className={linkClass}>Gestão</NavLink>
