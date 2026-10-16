@@ -32,6 +32,12 @@ export const getTrailById = async (trailId) => {
   return response.data
 }
 
+/** Verifica se o aluno logado já pode acessar a trilha. */
+export const canAccessTrail = async (trailId) => {
+  const response = await api.post(`/trails/${trailId}/can-access`)
+  return Boolean(response.data)
+}
+
 // ─── Perguntas ────────────────────────────────────────────────
 
 /**

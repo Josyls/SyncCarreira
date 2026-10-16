@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getTrails, getQuestionsByTrail, getAnswers } from '../../services/trailService'
+import { getTrails, canAccessTrail, getQuestionsByTrail, getAnswers } from '../../services/trailService'
 import AppHeader from '../../components/AppHeader/AppHeader.jsx'
 import { isAdministrator, isPsychologist } from '../../utils/roles'
 import './HomePage.css'
@@ -10,16 +10,29 @@ import './HomePage.css'
 
 function TrailCard({ trail, studentId, onEnter, refreshKey }) {
   const [progress, setProgress] = useState(null)
+  const [access, setAccess] = useState('checking')
 
   // refreshKey muda quando o usuário volta para a Home — força recarregar o progresso
   useEffect(() => {
     if (!trail?.id || !studentId) return
 
     setProgress(null) // reseta para mostrar "Carregando..."
+    setAccess('checking')
+    let current = true
 
     async function loadProgress() {
       try {
+        const allowed = await canAccessTrail(trail.id)
+        if (!current) return
+        if (!allowed) {
+          setAccess('locked')
+          setProgress({ pct: 0, answered: 0, total: 0 })
+          return
+        }
+        setAccess('allowed')
+
         const questions = await getQuestionsByTrail(trail.id)
+        if (!current) return
         const total = questions.length
         if (total === 0) { setProgress({ pct: 0, answered: 0, total: 0 }); return }
 
@@ -42,24 +55,33 @@ function TrailCard({ trail, studentId, onEnter, refreshKey }) {
         setProgress({ pct: Math.round((answered / total) * 100), answered, total })
 
       } catch {
-        setProgress({ pct: 0, answered: 0, total: '?' })
+        if (!current) return
+        setAccess('error')
+        setProgress(null)
       }
     }
 
     loadProgress()
+    return () => { current = false }
   }, [trail?.id, studentId, refreshKey]) // refreshKey garante reload ao voltar
 
+  const isLocked = access === 'locked'
+  const accessFailed = access === 'error'
   const isComplete = progress?.pct === 100
   const isStarted  = progress?.answered > 0
 
   let buttonLabel = 'Iniciar'
-  if (isComplete)     buttonLabel = 'Revisar'
+  if (isLocked)       buttonLabel = 'Bloqueada'
+  else if (accessFailed) buttonLabel = 'Indisponível'
+  else if (isComplete)     buttonLabel = 'Revisar'
   else if (isStarted) buttonLabel = 'Continuar'
 
   return (
-    <div className={`hp-trail-card${isComplete ? ' hp-trail-card--done' : ''}`}>
+    <div className={`hp-trail-card${isComplete ? ' hp-trail-card--done' : ''}${isLocked || accessFailed ? ' hp-trail-card--locked' : ''}`}>
       <div className="hp-trail-card__icon" aria-hidden="true">
-        {isComplete
+        {isLocked || accessFailed ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3" strokeLinecap="round"/></svg>
+        ) : isComplete
           ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" width="22" height="22"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round"/><polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/></svg>
           : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" strokeLinecap="round"/><path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
         }
@@ -68,8 +90,12 @@ function TrailCard({ trail, studentId, onEnter, refreshKey }) {
       <div className="hp-trail-card__info">
         <span className="hp-trail-card__name">{trail.name}</span>
 
-        {progress === null ? (
+        {access === 'checking' || progress === null ? (
           <span className="hp-trail-card__loading">Carregando progresso…</span>
+        ) : isLocked ? (
+          <span className="hp-trail-card__lock-message">Conclua a trilha anterior, incluindo a síntese, para liberar esta etapa.</span>
+        ) : accessFailed ? (
+          <span className="hp-trail-card__lock-message">Não foi possível verificar o acesso. Atualize a página e tente novamente.</span>
         ) : (
           <>
             <div className="hp-trail-card__bar">
@@ -88,6 +114,8 @@ function TrailCard({ trail, studentId, onEnter, refreshKey }) {
       <button
         className={`hp-trail-card__btn${isComplete ? ' hp-trail-card__btn--done' : ''}`}
         onClick={() => onEnter(trail.id)}
+        disabled={access !== 'allowed'}
+        aria-disabled={access !== 'allowed'}
       >
         {buttonLabel}
       </button>
@@ -103,6 +131,7 @@ export default function HomePage() {
   // Psicóloga não responde trilhas: a Home dela leva para os agendamentos
   const psicologa = isPsychologist(user)
   const administradora = isAdministrator(user)
+  const aluno = user?.roles?.some(role => role.authority === 'ROLE_USER') || user?.perfil === 'ROLE_USER'
 
   const [trails, setTrails]         = useState([])
   const [loadingTrails, setLoadingTrails] = useState(true)
@@ -119,7 +148,7 @@ export default function HomePage() {
 
   // Carrega lista de trilhas uma vez
   useEffect(() => {
-    if (psicologa) {
+    if (psicologa || !aluno) {
       setLoadingTrails(false)
       return
     }
@@ -134,7 +163,7 @@ export default function HomePage() {
       }
     }
     load()
-  }, [psicologa])
+  }, [psicologa, aluno])
 
   // Ao entrar numa trilha, atualiza o refreshKey ao voltar via navigate
   function handleEnterTrail(id) {
@@ -184,7 +213,7 @@ export default function HomePage() {
           </div>
 
           {/* Seção de trilhas (só para alunos) */}
-          {!psicologa && (
+          {aluno && (
           <section className="hp-trails">
             <h2 className="hp-trails__title">Suas trilhas</h2>
 

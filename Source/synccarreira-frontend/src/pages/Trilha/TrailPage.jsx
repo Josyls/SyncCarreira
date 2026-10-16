@@ -24,6 +24,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
   getTrailById,
+  canAccessTrail,
   getQuestionsByTrail,
   getAnswers,
   postAnswer,
@@ -206,24 +207,33 @@ function LikertQuestion({ question, selectedOptionId, onSelect, saveStatus }) {
  * RF-11 — Síntese final da trilha: texto livre, sem restrição de conteúdo.
  * Depois de salva, fica somente leitura (a API só oferece POST).
  */
-function SynthesisCard({ value, onChange, onSave, saveStatus, locked }) {
+function SynthesisCard({ value, onChange, onSave, saveStatus, locked, finalJourney, withoutQuestions }) {
   return (
-      <section className="tp-synthesis">
-        <h2 className="tp-synthesis__title">Síntese da trilha</h2>
+      <section className={`tp-synthesis${finalJourney ? ' tp-synthesis--journey' : ''}`}>
+        {finalJourney && <span className="tp-synthesis__eyebrow">Etapa final da jornada</span>}
+        <h2 className="tp-synthesis__title">
+          {finalJourney ? 'Síntese final da jornada' : 'Síntese da trilha'}
+        </h2>
         <p className="tp-synthesis__hint">
           {locked
-              ? 'Síntese registrada.'
-              : 'Para concluir a trilha, escreva suas reflexões e conclusões. Não há certo ou errado.'}
+              ? finalJourney ? 'Síntese final da jornada registrada.' : 'Síntese registrada.'
+              : finalJourney
+                  ? withoutQuestions
+                      ? 'A consulta aos links desta trilha é opcional. Registre aqui o que descobriu ao longo de toda a jornada; não há certo ou errado.'
+                      : 'Reflita sobre sua jornada completa e registre o que descobriu ao percorrer as trilhas. Não há certo ou errado.'
+                  : 'Para concluir a trilha, escreva suas reflexões e conclusões. Não há certo ou errado.'}
         </p>
 
         <textarea
             className="tp-synthesis__input"
-            aria-label="Síntese da trilha"
+            aria-label={finalJourney ? 'Síntese final da jornada' : 'Síntese da trilha'}
             rows={7}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             readOnly={locked}
-            placeholder="O que esta trilha revelou sobre você?"
+            placeholder={finalJourney
+                ? 'O que você descobriu ao longo de toda a jornada?'
+                : 'O que esta trilha revelou sobre você?'}
         />
 
         {!locked && (
@@ -235,7 +245,7 @@ function SynthesisCard({ value, onChange, onSave, saveStatus, locked }) {
                   onClick={onSave}
                   disabled={saveStatus === 'saving' || !value.trim()}
               >
-                Salvar e concluir trilha
+                {finalJourney ? 'Salvar síntese final' : 'Salvar e concluir trilha'}
               </button>
             </div>
         )}
@@ -288,6 +298,13 @@ export default function TrailPage() {
       // 1. Busca os dados obrigatórios da trilha
       try {
         console.log('[TrailPage] Carregando trilha', numericTrailId, 'para usuário', user.id)
+
+        const allowed = await canAccessTrail(numericTrailId)
+        if (!allowed) {
+          setPageError('Esta trilha está bloqueada. Conclua as perguntas e salve a síntese da trilha anterior para liberá-la.')
+          setLoadingPage(false)
+          return
+        }
 
         const [trailData, questionsRes] = await Promise.all([
           getTrailById(numericTrailId),
@@ -393,6 +410,11 @@ export default function TrailPage() {
       ? Math.round((answeredCount / totalQuestions) * 100)
       : 0
   const isComplete       = answeredCount === totalQuestions && totalQuestions > 0
+  const isJourneySynthesis = trail?.name
+      ?.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase() === 'INFORMACAO'
+  const canShowSynthesis = isComplete || (isJourneySynthesis && questions.length === 0)
 
   // ── Renderização ──────────────────────────────────────────
 
@@ -414,7 +436,7 @@ export default function TrailPage() {
           <PageHeader trail={null} progressPct={0} onBack={() => navigate('/home')} />
           <div className="tp-error-state">
             <p>{pageError}</p>
-            <button onClick={() => window.location.reload()}>Tentar novamente</button>
+            <button onClick={() => navigate('/home')}>Voltar para as trilhas</button>
           </div>
         </div>
     )
@@ -506,7 +528,7 @@ export default function TrailPage() {
           })}
 
           {/* ── Síntese (RF-11) + banner de conclusão ── */}
-          {isComplete && (
+          {canShowSynthesis && (
               <>
                 <SynthesisCard
                     value={synthesis}
@@ -517,6 +539,8 @@ export default function TrailPage() {
                     onSave={handleSaveSynthesis}
                     saveStatus={synthesisStatus}
                     locked={!!savedSynthesis}
+                    finalJourney={isJourneySynthesis}
+                    withoutQuestions={questions.length === 0}
                 />
 
                 {savedSynthesis && (
@@ -527,8 +551,10 @@ export default function TrailPage() {
                           <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </div>
-                      <h2>Trilha concluída! 🎉</h2>
-                      <p>Você respondeu todas as perguntas. Seus dados foram salvos e seu perfil vocacional está sendo calculado.</p>
+                      <h2>{isJourneySynthesis ? 'Jornada concluída! 🎉' : 'Trilha concluída! 🎉'}</h2>
+                      <p>{isJourneySynthesis
+                          ? 'Você concluiu todas as trilhas e registrou sua síntese final da jornada.'
+                          : 'Você respondeu todas as perguntas. Seus dados foram salvos e seu perfil vocacional está sendo calculado.'}</p>
                     </div>
                 )}
               </>
