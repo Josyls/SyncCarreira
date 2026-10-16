@@ -706,6 +706,15 @@ export default function TrailPage() {
                       <p>{isJourneySynthesis
                           ? 'Você concluiu todas as trilhas e registrou sua síntese final da jornada.'
                           : 'Você respondeu todas as perguntas. Seus dados foram salvos e seu perfil vocacional está sendo calculado.'}</p>
+                      {isJourneySynthesis && (
+                        <button
+                          className="tp-done__result-btn"
+                          type="button"
+                          onClick={() => navigate('/resultado-jornada')}
+                        >
+                          Ver meu leque de carreiras
+                        </button>
+                      )}
                     </div>
                 )}
               </>

@@ -9,6 +9,7 @@ import StudentDetailPage from '../pages/Psicologas/studentdetailPage.jsx'
 import StudentFormPage from '../pages/Psicologas/studentformPage.jsx'
 import AgendamentosPage from '../pages/Agendamentos/AgendamentosPage.jsx'
 import InformationLinkManagementPage from '../pages/Psicologas/InformationLinkManagementPage.jsx'
+import JourneyResultPage from '../pages/ResultadoJornada/JourneyResultPage.jsx'
 import { isAdministrator, isPsychologist } from '../utils/roles.js'
 
 function PrivateRoute({ children }) {
@@ -37,6 +38,16 @@ function PsychologistRoute({ children }) {
         : <Navigate to={user ? "/home" : "/login"} replace />
 }
 
+function StudentRoute({ children }) {
+    const { user } = useAuth()
+    const studentRoles = ['ROLE_USER', 'ROLE_STUDENT', 'ROLE_ALUNO']
+    const isStudent = user?.roles?.some(role => studentRoles.includes(role.authority))
+        || studentRoles.includes(user?.perfil)
+    return user && isStudent
+        ? children
+        : <Navigate to={user ? "/home" : "/login"} replace />
+}
+
 export default function AppRoutes() {
     return (
         <Routes>
@@ -47,6 +58,9 @@ export default function AppRoutes() {
             } />
             <Route path="/trail/:trailId" element={
                 <PrivateRoute><TrailPage /></PrivateRoute>
+            } />
+            <Route path="/resultado-jornada" element={
+                <PrivateRoute><StudentRoute><JourneyResultPage /></StudentRoute></PrivateRoute>
             } />
 
             <Route path="/gestao" element={
