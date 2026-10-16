@@ -11,6 +11,10 @@ import './HomePage.css'
 function TrailCard({ trail, studentId, onEnter, refreshKey }) {
   const [progress, setProgress] = useState(null)
   const [access, setAccess] = useState('checking')
+  const isInformationTrail = trail?.name
+      ?.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase() === 'INFORMACAO'
 
   // refreshKey muda quando o usuário volta para a Home — força recarregar o progresso
   useEffect(() => {
@@ -70,7 +74,7 @@ function TrailCard({ trail, studentId, onEnter, refreshKey }) {
   const isComplete = progress?.pct === 100
   const isStarted  = progress?.answered > 0
 
-  let buttonLabel = 'Iniciar'
+  let buttonLabel = isInformationTrail ? 'Acessar' : 'Iniciar'
   if (isLocked)       buttonLabel = 'Bloqueada'
   else if (accessFailed) buttonLabel = 'Indisponível'
   else if (isComplete)     buttonLabel = 'Revisar'
@@ -91,11 +95,13 @@ function TrailCard({ trail, studentId, onEnter, refreshKey }) {
         <span className="hp-trail-card__name">{trail.name}</span>
 
         {access === 'checking' || progress === null ? (
-          <span className="hp-trail-card__loading">Carregando progresso…</span>
+          <span className="hp-trail-card__loading">{isInformationTrail ? 'Verificando acesso…' : 'Carregando progresso…'}</span>
         ) : isLocked ? (
           <span className="hp-trail-card__lock-message">Conclua a trilha anterior, incluindo a síntese, para liberar esta etapa.</span>
         ) : accessFailed ? (
           <span className="hp-trail-card__lock-message">Não foi possível verificar o acesso. Atualize a página e tente novamente.</span>
+        ) : isInformationTrail ? (
+          <span className="hp-trail-card__final-step">Etapa final · síntese da jornada</span>
         ) : (
           <>
             <div className="hp-trail-card__bar">

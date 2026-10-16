@@ -279,6 +279,13 @@ function InformationLinks({ data, loading, error }) {
   const universityLinks = data?.universityAccessLinks ?? []
   const recommendedAreas = data?.recommendedAreas ?? []
   const hasLinks = careerLinks.length > 0 || universityLinks.length > 0
+  const careerGroups = recommendedAreas
+      .map(area => ({ area, links: careerLinks.filter(link => link.knowledgeArea === area) }))
+      .filter(group => group.links.length > 0)
+  const uncategorizedLinks = careerLinks.filter(link => !recommendedAreas.includes(link.knowledgeArea))
+  if (uncategorizedLinks.length > 0) careerGroups.push({ area: null, links: uncategorizedLinks })
+  if (careerGroups.length === 0 && careerLinks.length > 0) careerGroups.push({ area: null, links: careerLinks })
+  const areaLabel = area => KNOWLEDGE_AREA_LABELS[area] ?? area ?? 'Outras áreas'
 
   return (
     <section className="tp-info-links" aria-labelledby="tp-info-links-title">
@@ -292,41 +299,74 @@ function InformationLinks({ data, loading, error }) {
 
       {careerLinks.length > 0 && (
         <div className="tp-info-links__group">
-          <h3>Carreiras e áreas de interesse</h3>
-          {recommendedAreas.length > 0 && (
-            <p className="tp-info-links__caption">
-              Sugestões relacionadas a {recommendedAreas.map(area => KNOWLEDGE_AREA_LABELS[area] ?? area).join(', ')}.
-            </p>
-          )}
-          <ul>
-            {careerLinks.map(link => (
-              <li key={link.id}>
-                <a href={link.url} target="_blank" rel="noopener noreferrer">
-                  <span>{link.topic}</span><span aria-hidden="true">↗</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <div className="tp-info-links__section-heading">
+            <span className="tp-info-links__section-icon" aria-hidden="true">✦</span>
+            <div>
+              <h3>Carreiras e áreas de interesse</h3>
+              {recommendedAreas.length > 0 && (
+                <p className="tp-info-links__caption">Recomendações para {recommendedAreas.map(areaLabel).join(' e ')}</p>
+              )}
+            </div>
+          </div>
+          {careerGroups.map(group => (
+            <div className="tp-info-links__area" key={group.area ?? 'outras'}>
+              {group.area && <h4>{areaLabel(group.area)}</h4>}
+              <ul className="tp-info-links__grid">
+                {group.links.map(link => <InformationLinkCard key={link.id} link={link} />)}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 
       {universityLinks.length > 0 && (
         <div className="tp-info-links__group">
-          <h3>Acesso à universidade</h3>
-          <ul>
-            {universityLinks.map(link => (
-              <li key={link.id}>
-                <a href={link.url} target="_blank" rel="noopener noreferrer">
-                  <span>{link.topic}</span><span aria-hidden="true">↗</span>
-                </a>
-              </li>
-            ))}
+          <div className="tp-info-links__section-heading">
+            <span className="tp-info-links__section-icon tp-info-links__section-icon--university" aria-hidden="true">⌂</span>
+            <div>
+              <h3>Acesso à universidade</h3>
+              <p className="tp-info-links__caption">ENEM, programas de ingresso e outras oportunidades</p>
+            </div>
+          </div>
+          <ul className="tp-info-links__grid">
+            {universityLinks.map(link => <InformationLinkCard key={link.id} link={link} />)}
           </ul>
         </div>
       )}
 
       {!hasLinks && <p className="tp-info-links__empty">Ainda não há materiais cadastrados. Você pode continuar e salvar sua síntese.</p>}
     </section>
+  )
+}
+
+function InformationLinkCard({ link }) {
+  const [iconFailed, setIconFailed] = useState(false)
+  let faviconUrl = ''
+  let domain = link.url
+
+  try {
+    const parsedUrl = new URL(link.url)
+    domain = parsedUrl.hostname
+    faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
+  } catch {
+    // Exibe o ícone genérico quando a URL não tem um domínio válido.
+  }
+
+  return (
+    <li className="tp-info-link-card">
+      <span className="tp-info-link-card__favicon" aria-hidden="true">
+        {faviconUrl && !iconFailed
+          ? <img src={faviconUrl} alt="" loading="lazy" onError={() => setIconFailed(true)} />
+          : <span>↗</span>}
+      </span>
+      <span className="tp-info-link-card__content">
+        <strong>{link.topic}</strong>
+        <span>{domain}</span>
+      </span>
+      <a href={link.url} target="_blank" rel="noopener noreferrer" aria-label={`Acessar ${link.topic}`}>
+        Acessar <span aria-hidden="true">↗</span>
+      </a>
+    </li>
   )
 }
 
@@ -546,6 +586,7 @@ export default function TrailPage() {
         <PageHeader
             trail={trail}
             progressPct={progressPct}
+            showProgress={!isJourneySynthesis}
             onBack={() => navigate('/home')}
         />
 
@@ -558,7 +599,7 @@ export default function TrailPage() {
         <main className="tp-main">
 
           {/* ── Hero da trilha ── */}
-          <div className="tp-hero">
+          <div className={`tp-hero${isJourneySynthesis ? ' tp-hero--information' : ''}`}>
             <div className="tp-hero__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="26" height="26">
                 <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z" strokeLinecap="round"/>
@@ -566,21 +607,24 @@ export default function TrailPage() {
               </svg>
             </div>
             <div className="tp-hero__info">
+              {isJourneySynthesis && <span className="tp-hero__eyebrow">Etapa final da jornada</span>}
               <h1>{trail?.name ?? 'Trilha de Autoconhecimento'}</h1>
-              <p>{trail?.description ?? 'Responda as perguntas para descobrir seu perfil vocacional.'}</p>
+              <p>{isJourneySynthesis
+                ? 'Explore os materiais complementares se desejar e registre sua síntese sobre toda a jornada.'
+                : trail?.description ?? 'Responda as perguntas para descobrir seu perfil vocacional.'}</p>
             </div>
-            <div className="tp-hero__stats">
-            <span className="tp-hero__stat">
-              <strong>{answeredCount}</strong> / {totalQuestions} respondidas
-            </span>
+            {!isJourneySynthesis && <div className="tp-hero__stats">
               <span className="tp-hero__stat">
-              <strong>{progressPct}%</strong> concluído
-            </span>
-            </div>
+                <strong>{answeredCount}</strong> / {totalQuestions} respondidas
+              </span>
+              <span className="tp-hero__stat">
+                <strong>{progressPct}%</strong> concluído
+              </span>
+            </div>}
           </div>
 
           {/* ── Barra de progresso ── */}
-          <div className="tp-progress-card">
+          {!isJourneySynthesis && <div className="tp-progress-card">
             <div className="tp-progress-card__header">
               <span className="tp-progress-card__label">Seu progresso</span>
               <span className="tp-progress-card__count">
@@ -595,7 +639,7 @@ export default function TrailPage() {
             >
               {progressPct}%
             </progress>
-          </div>
+          </div>}
 
           {/* ── Lista de perguntas ── */}
           {questions.map((question) => {
@@ -673,7 +717,7 @@ export default function TrailPage() {
 
 // ─── Header reutilizável da trilha ────────────────────────────
 
-function PageHeader({ trail, progressPct, onBack }) {
+function PageHeader({ trail, progressPct, showProgress = true, onBack }) {
   return (
       <header className="tp-header">
         <div className="tp-header__left">
@@ -688,12 +732,12 @@ function PageHeader({ trail, progressPct, onBack }) {
         </span>
         </div>
 
-        <div className="tp-header__progress">
+        {showProgress && <div className="tp-header__progress">
           <span className="tp-header__pct">{progressPct}%</span>
           <div className="tp-progbar">
             <div className="tp-progbar__fill" style={{ width: `${progressPct}%` }} />
           </div>
-        </div>
+        </div>}
       </header>
   )
 }
