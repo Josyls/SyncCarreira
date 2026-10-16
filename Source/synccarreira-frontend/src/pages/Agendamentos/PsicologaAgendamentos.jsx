@@ -62,6 +62,7 @@ export default function PsicologaAgendamentos() {
   const [doubtStudents, setDoubtStudents]     = useState([])
   const [loadingDoubts, setLoadingDoubts]     = useState(true)
   const [doubtError, setDoubtError]           = useState('')
+  const [institutionStudentIds, setInstitutionStudentIds] = useState(null)
 
   const [tab, setTab]             = useState('AGENDADA')
   const [googleOn, setGoogleOn]   = useState(isGoogleConnected())
@@ -98,14 +99,17 @@ export default function PsicologaAgendamentos() {
     if (!psychologist.id) return
     setLoadingDoubts(true)
     setDoubtError('')
+    setInstitutionStudentIds(null)
     try {
       const panel = await getPsychologistPanel(psychologist.id)
+      setInstitutionStudentIds(new Set((panel.students ?? []).map(student => student.studentId)))
       const flagged = (panel.students ?? [])
         .filter(student => student.inDoubt)
         .sort((a, b) => new Date(a.doubtFlaggedAt) - new Date(b.doubtFlaggedAt))
       setDoubtStudents(flagged)
     } catch (err) {
-      setDoubtError(err.message)
+      setDoubtError('Não foi possível confirmar quais alunos pertencem à sua instituição. Tente novamente.')
+      setInstitutionStudentIds(new Set())
     } finally {
       setLoadingDoubts(false)
     }
@@ -225,7 +229,7 @@ export default function PsicologaAgendamentos() {
   const pendingFeedback = grouped.REALIZADA.filter(a => !a.feedback).length
   const visible = grouped[tab]
   const doubtStudentIds = new Set(doubtStudents.map(student => student.studentId))
-  const studentsWithDoubtStatus = students.map(student => ({
+  const studentsWithDoubtStatus = students.filter(student => institutionStudentIds?.has(student.id)).map(student => ({
     ...student,
     inDoubt: doubtStudentIds.has(student.id),
   }))
@@ -352,7 +356,7 @@ export default function PsicologaAgendamentos() {
         <SessionFormModal
           initial={modal.appointment}
           students={studentsWithDoubtStatus}
-          loadingStudents={loadingStudents}
+          loadingStudents={loadingStudents || loadingDoubts}
           doubtStudentsLoading={loadingDoubts}
           doubtStudentsError={doubtError}
           doubtStudentCount={doubtStudents.length}

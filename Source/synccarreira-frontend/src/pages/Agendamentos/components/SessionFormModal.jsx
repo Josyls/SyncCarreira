@@ -67,12 +67,10 @@ export default function SessionFormModal({
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState('')
 
-  // Alunos da sessão em edição que por algum motivo não vieram na lista
+  // A lista recebida já está limitada aos alunos da instituição da psicóloga.
   const allStudents = useMemo(() => {
-    const map = new Map(students.map(s => [s.id, s]))
-    initial?.students?.forEach(s => { if (!map.has(s.id)) map.set(s.id, s) })
-    return [...map.values()]
-  }, [students, initial])
+    return students
+  }, [students])
 
   const filtered = useMemo(() => {
     const candidates = onlyInDoubt ? allStudents.filter(student => student.inDoubt) : allStudents
@@ -223,12 +221,13 @@ export default function SessionFormModal({
                   {doubtStudentsLoading ? 'Carregando…' : `${doubtStudentCount} sinalizado(s)`}
                 </span>
               </label>
-              {doubtStudentsError && (
-                <div className="ag-doubt-filter__error">
-                  <span>{doubtStudentsError}</span>
-                  <button type="button" className="ag-link" onClick={onRetryDoubtStudents}>Tentar novamente</button>
-                </div>
-              )}
+            </div>
+          )}
+
+          {doubtStudentsError && (
+            <div className="ag-doubt-filter__error">
+              <span>{doubtStudentsError}</span>
+              <button type="button" className="ag-link" onClick={onRetryDoubtStudents}>Tentar novamente</button>
             </div>
           )}
 
