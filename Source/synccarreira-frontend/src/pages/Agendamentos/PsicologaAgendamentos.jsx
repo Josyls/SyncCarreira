@@ -115,7 +115,7 @@ export default function PsicologaAgendamentos() {
     }
   }, [psychologist.id])
 
-  useEffect(() => { loadDoubtStudents() }, [loadDoubtStudents])
+  useEffect(() => { void loadDoubtStudents() }, [loadDoubtStudents])
 
   useEffect(() => {
     if (!toast) return

@@ -544,9 +544,8 @@ export default function AccountManagementPage() {
             </main>
 
             {modalOpen && (
-                <div className="students-modal-backdrop" onMouseDown={event => {
-                    if (event.target === event.currentTarget) setModalOpen(false)
-                }}>
+                <div className="students-modal-backdrop">
+                    <button className="students-modal-dismiss" type="button" aria-label="Fechar cadastro" onClick={() => setModalOpen(false)} />
                     <section className="students-modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
                         <div className="students-modal-heading">
                             <div>
@@ -618,9 +617,8 @@ export default function AccountManagementPage() {
             )}
 
             {classModalOpen && (
-                <div className="students-modal-backdrop" onMouseDown={event => {
-                    if (event.target === event.currentTarget) setClassModalOpen(false)
-                }}>
+                <div className="students-modal-backdrop">
+                    <button className="students-modal-dismiss" type="button" aria-label="Fechar cadastro de turma" onClick={() => setClassModalOpen(false)} />
                     <section className="students-modal" role="dialog" aria-modal="true" aria-labelledby="class-modal-title">
                         <div className="students-modal-heading">
                             <div>
@@ -664,9 +662,8 @@ export default function AccountManagementPage() {
             )}
 
             {assignmentModalOpen && (
-                <div className="students-modal-backdrop" onMouseDown={event => {
-                    if (event.target === event.currentTarget) setAssignmentModalOpen(false)
-                }}>
+                <div className="students-modal-backdrop">
+                    <button className="students-modal-dismiss" type="button" aria-label="Fechar vínculo de turma" onClick={() => setAssignmentModalOpen(false)} />
                     <section className="students-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-modal-title">
                         <div className="students-modal-heading">
                             <div>
@@ -706,9 +703,8 @@ export default function AccountManagementPage() {
             )}
 
             {institutionModalOpen && (
-                <div className="students-modal-backdrop" onMouseDown={event => {
-                    if (event.target === event.currentTarget) setInstitutionModalOpen(false)
-                }}>
+                <div className="students-modal-backdrop">
+                    <button className="students-modal-dismiss" type="button" aria-label="Fechar cadastro de instituição" onClick={() => setInstitutionModalOpen(false)} />
                     <section className="students-modal" role="dialog" aria-modal="true" aria-labelledby="institution-modal-title">
                         <div className="students-modal-heading">
                             <div>

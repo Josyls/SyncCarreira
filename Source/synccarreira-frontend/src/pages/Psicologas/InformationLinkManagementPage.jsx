@@ -53,7 +53,7 @@ export default function InformationLinkManagementPage() {
     }
   }, [])
 
-  useEffect(() => { loadLinks() }, [loadLinks])
+  useEffect(() => { void loadLinks() }, [loadLinks])
 
   function updateForm(field, value) {
     setForm(current => ({ ...current, [field]: value }))

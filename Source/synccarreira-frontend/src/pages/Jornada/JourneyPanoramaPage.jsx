@@ -194,7 +194,7 @@ export default function JourneyPanoramaPage() {
       }
     }
 
-    load()
+    void load()
     return () => { active = false }
   }, [user?.id])
 

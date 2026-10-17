@@ -111,10 +111,11 @@ export default function ProgressDashboardPage() {
     }
   }, [user?.id])
 
-  useEffect(() => { loadPanel() }, [loadPanel])
+  useEffect(() => { void loadPanel() }, [loadPanel])
 
   const students = panel?.students ?? []
-  const classes = useMemo(() => [...new Set(students.map(student => student.schoolClassName).filter(Boolean))].sort(), [students])
+  const classes = useMemo(() => [...new Set(students.map(student => student.schoolClassName).filter(Boolean))]
+    .sort((first, second) => first.localeCompare(second, 'pt-BR')), [students])
   const filteredStudents = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
     return students.filter(student => {
