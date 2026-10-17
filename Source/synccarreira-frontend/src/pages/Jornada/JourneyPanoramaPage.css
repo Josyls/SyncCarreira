@@ -1,0 +1,77 @@
+.jp-page { min-height: 100vh; background: #f6f5fb; color: #20213d; }
+.jp-main { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 80px; }
+.jp-hero { position: relative; overflow: hidden; padding: 48px 54px; border: 1px solid #ded5ff; border-radius: 26px; background: linear-gradient(115deg, #fff 5%, #f0eaff 100%); box-shadow: 0 18px 50px rgba(49, 35, 94, .06); }
+.jp-hero::after { content: ''; position: absolute; width: 260px; height: 260px; right: -90px; bottom: -150px; border: 1px solid rgba(107, 72, 255, .16); border-radius: 50%; box-shadow: 0 0 0 28px rgba(107, 72, 255, .035), 0 0 0 58px rgba(107, 72, 255, .025); }
+.jp-hero__mark { position: absolute; right: 56px; top: 44px; width: 66px; height: 66px; display: grid; place-items: center; color: #704bff; font-size: 30px; background: rgba(255,255,255,.64); border: 1px solid #ded5ff; border-radius: 22px; transform: rotate(8deg); }
+.jp-eyebrow, .jp-step__eyebrow { color: #704bff; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.jp-hero h1 { margin: 13px 0 10px; color: #201b42; font-size: clamp(30px, 4vw, 44px); letter-spacing: -.04em; line-height: 1.1; }
+.jp-hero > p { max-width: 680px; margin: 0; color: #67647d; font-size: 16px; line-height: 1.7; }
+.jp-hero__meta { display: inline-block; margin-top: 22px; color: #695f8c; font-size: 13px; }
+.jp-current, .jp-past { margin-top: 48px; }
+.jp-section-heading { display: flex; align-items: flex-start; gap: 16px; margin: 0 0 24px; }
+.jp-section-heading__number { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; color: #6844f5; background: #ebe6ff; border-radius: 13px; font-size: 12px; font-weight: 800; }
+.jp-section-heading__number--warm { color: #a16a20; background: #fff1d6; }
+.jp-section-heading h2 { margin: 0; color: #252342; font-size: 21px; letter-spacing: -.02em; }
+.jp-section-heading p { margin: 5px 0 0; color: #76738b; font-size: 14px; }
+.jp-roadmap { padding: 8px 0 2px; }
+.jp-step { position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 18px; padding-bottom: 24px; }
+.jp-step:not(.jp-step--last)::before { content: ''; position: absolute; z-index: 0; top: 43px; bottom: -1px; left: 21px; width: 2px; background: linear-gradient(#d7cff6, #e4e0ed); }
+.jp-step__marker { position: relative; z-index: 1; width: 44px; height: 44px; display: grid; place-items: center; color: #776b99; background: #eeecf3; border: 5px solid #f6f5fb; border-radius: 50%; font-size: 11px; font-weight: 800; }
+.jp-step--complete .jp-step__marker { color: white; background: #7350ff; box-shadow: 0 5px 14px rgba(115,80,255,.2); }
+.jp-step--progress .jp-step__marker { color: #6844f5; background: #e9e2ff; border-color: #f6f5fb; }
+.jp-step__content { min-width: 0; padding: 24px 28px; background: #fff; border: 1px solid #e6e3ef; border-radius: 20px; box-shadow: 0 8px 25px rgba(34,28,68,.035); }
+.jp-step--complete .jp-step__content { border-color: #d9ceff; }
+.jp-step__heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.jp-step__heading h2 { margin: 5px 0 0; color: #292544; font-size: 19px; }
+.jp-status { flex: 0 0 auto; padding: 7px 11px; color: #777388; background: #f0eff4; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.jp-status--complete { color: #25734a; background: #e7f5ed; }
+.jp-status--progress { color: #6542dc; background: #eee9ff; }
+.jp-step__caption { margin: 8px 0 0; color: #858198; font-size: 12px; }
+.jp-memories { margin-top: 22px; padding-top: 18px; border-top: 1px solid #efedf4; }
+.jp-memories h3 { margin: 0 0 14px; color: #544d73; font-size: 13px; }
+.jp-memory { padding: 14px 16px; background: #faf9fd; border-radius: 13px; }
+.jp-memory + .jp-memory { margin-top: 9px; }
+.jp-memory > span, .jp-synthesis > span { color: #877fa2; font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.jp-memory p { margin: 6px 0 8px; color: #38344e; font-size: 14px; line-height: 1.55; }
+.jp-memory strong { color: #6744e8; font-size: 13px; font-weight: 650; line-height: 1.55; }
+.jp-synthesis { margin-top: 14px; padding: 18px 20px; background: linear-gradient(120deg, #f5f0ff, #fbf9ff); border: 1px solid #e8ddff; border-radius: 14px; }
+.jp-synthesis p { margin: 9px 0 0; color: #423b5e; font-size: 14px; line-height: 1.75; white-space: pre-wrap; }
+.jp-synthesis time { display: block; margin-top: 10px; color: #8b83a4; font-size: 11px; }
+.jp-step__empty { margin: 18px 0 0; padding: 13px 15px; color: #777388; background: #f8f7fa; border-radius: 12px; font-size: 13px; }
+.jp-past-card { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 24px; margin-top: 14px; padding: 24px; background: #fff; border: 1px solid #eee4d1; border-radius: 19px; }
+.jp-past-card__number { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 110px; color: #9b6b25; background: #fff7e9; border-radius: 15px; }
+.jp-past-card__number span { font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.jp-past-card__number strong { margin-top: 4px; font-size: 36px; line-height: 1; }
+.jp-past-card__body h3 { margin: 2px 0 6px; color: #302b45; font-size: 16px; }
+.jp-past-card__date, .jp-past-card__context { margin: 0; color: #777388; font-size: 12px; }
+.jp-past-card__context { margin-top: 5px; }
+.jp-area-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.jp-area-chips span { padding: 6px 9px; color: #805a21; background: #fff3da; border-radius: 99px; font-size: 10px; font-weight: 700; }
+.jp-score-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.jp-score-list > div { min-width: 130px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 10px; color: #777388; background: #faf9fc; border-radius: 9px; font-size: 10px; }
+.jp-score-list strong { color: #5f4d91; font-size: 11px; }
+.jp-past-empty, .jp-history-error, .jp-state { padding: 22px; color: #777388; background: white; border: 1px solid #e6e3ef; border-radius: 15px; font-size: 14px; }
+.jp-history-error { color: #8e4747; }
+.jp-state { margin-top: 26px; text-align: center; }
+.jp-state--error { color: #963c4c; border-color: #f0ccd2; }
+
+@media (max-width: 640px) {
+  .jp-main { width: min(100% - 28px, 1120px); padding-top: 22px; }
+  .jp-hero { padding: 32px 24px; border-radius: 20px; }
+  .jp-hero__mark { top: 23px; right: 22px; width: 46px; height: 46px; border-radius: 16px; font-size: 22px; }
+  .jp-hero h1 { max-width: 78%; font-size: 31px; }
+  .jp-hero > p { font-size: 14px; }
+  .jp-current, .jp-past { margin-top: 36px; }
+  .jp-section-heading h2 { font-size: 18px; }
+  .jp-section-heading p { font-size: 12px; line-height: 1.5; }
+  .jp-step { grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding-bottom: 16px; }
+  .jp-step:not(.jp-step--last)::before { left: 16px; top: 35px; }
+  .jp-step__marker { width: 34px; height: 34px; border-width: 4px; font-size: 9px; }
+  .jp-step__content { padding: 18px 15px; border-radius: 16px; }
+  .jp-step__heading { align-items: flex-start; flex-direction: column; }
+  .jp-step__heading h2 { font-size: 17px; }
+  .jp-past-card { grid-template-columns: 68px minmax(0, 1fr); gap: 14px; padding: 16px; }
+  .jp-past-card__number { min-height: 78px; }
+  .jp-past-card__number strong { font-size: 28px; }
+  .jp-score-list > div { flex: 1 1 100%; }
+}

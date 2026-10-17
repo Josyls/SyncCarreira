@@ -97,6 +97,59 @@
   gap: 12px;
 }
 
+.tp-answers-warning {
+  width: min(720px, calc(100% - 48px));
+  margin: 20px auto 0;
+  padding: 12px 16px;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-white);
+  color: var(--sc-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Materiais opcionais da trilha Informação (RF-06) ─────── */
+.tp-info-links {
+  padding: 22px 24px;
+  border: 1px solid #d9d3f5;
+  border-radius: var(--sc-radius-lg);
+  background: linear-gradient(145deg, #fff 0%, #faf8ff 100%);
+  box-shadow: var(--sc-shadow);
+}
+
+.tp-info-links__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.tp-info-links__heading h2 { margin: 3px 0 0; color: var(--sc-text); font-size: 17px; }
+.tp-info-links__heading > p { max-width: 310px; margin: 0; color: var(--sc-muted); font-size: 12px; line-height: 1.5; }
+.tp-info-links__eyebrow { color: var(--sc-roxo); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.tp-info-links__group { margin-top: 20px; }
+.tp-info-links__group h3 { margin: 0; color: var(--sc-text); font-size: 13px; }
+.tp-info-links__caption { margin: 5px 0 0; color: var(--sc-muted); font-size: 11px; }
+.tp-info-links__section-heading { display: flex; align-items: center; gap: 11px; }
+.tp-info-links__section-icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 12px; background: #eee9ff; color: var(--sc-roxo); font-size: 19px; }
+.tp-info-links__section-icon--university { background: #e9f6ef; color: #2d8158; }
+.tp-info-links__area { margin-top: 15px; }
+.tp-info-links__area h4 { margin: 0 0 8px; color: var(--sc-text); font-size: 12px; }
+.tp-info-links__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 12px 0 0; padding: 0; list-style: none; }
+.tp-info-link-card { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--sc-border); border-radius: var(--sc-radius-md); background: var(--sc-white); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.tp-info-link-card:hover { transform: translateY(-1px); border-color: #c7baff; box-shadow: 0 5px 15px rgba(91, 58, 190, .08); }
+.tp-info-link-card__favicon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: #f3f1ff; color: var(--sc-roxo); font-size: 17px; }
+.tp-info-link-card__favicon img { width: 22px; height: 22px; object-fit: contain; }
+.tp-info-link-card__content { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.tp-info-link-card__content strong { overflow: hidden; color: var(--sc-text); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.tp-info-link-card__content > span { overflow: hidden; color: var(--sc-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tp-info-link-card > a { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 7px 9px; border-radius: 7px; background: #f2efff; color: #5a35e8; font-size: 10px; font-weight: 700; text-decoration: none; }
+.tp-info-link-card > a:hover { background: #e7e0ff; }
+.tp-info-links__empty, .tp-info-links--error > p { margin: 16px 0 0; color: var(--sc-muted); font-size: 13px; line-height: 1.5; }
+.tp-info-links--error { border-color: #f0d3a2; background: #fffaf0; }
+.tp-info-links--error h2 { margin: 0; color: var(--sc-text); font-size: 16px; }
+
 /* ── Hero da trilha ────────────────────────────────────────── */
 .tp-hero {
   background: var(--sc-white);
@@ -108,6 +161,22 @@
   gap: 20px;
   box-shadow: var(--sc-shadow);
   margin-bottom: 8px;
+}
+
+.tp-hero--information {
+  border-color: #d9d1ff;
+  background: linear-gradient(120deg, #fff 0%, #f6f2ff 100%);
+  padding: 30px 32px;
+}
+
+.tp-hero__eyebrow {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--sc-roxo);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 
 .tp-hero__icon {
@@ -505,8 +574,131 @@
   line-height: 1.55;
 }
 
+.tp-done__result-btn {
+  margin-top: 18px;
+  padding: 10px 17px;
+  border: 0;
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-roxo);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.tp-done__result-btn:hover { background: var(--sc-roxo-hover); }
+
+/* ── Síntese da trilha (RF-11) ─────────────────────────────── */
+.tp-synthesis {
+  background: var(--sc-white);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--sc-shadow);
+}
+
+.tp-synthesis--journey {
+  border: 1.5px solid #c9baff;
+  background: linear-gradient(145deg, #fff 0%, #fbf9ff 100%);
+  padding: 28px;
+  box-shadow: 0 10px 28px rgba(91, 58, 190, 0.12);
+}
+
+.tp-synthesis__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 9px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eee9ff;
+  color: var(--sc-roxo);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tp-synthesis__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--sc-text);
+  margin-bottom: 4px;
+}
+
+.tp-synthesis__hint {
+  font-size: 13px;
+  color: var(--sc-muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.tp-synthesis__input {
+  width: 100%;
+  min-height: 140px;
+  padding: 12px 16px;
+  border: 1.5px solid var(--sc-border);
+  border-radius: var(--sc-radius-md);
+  background: #fafafa;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sc-text);
+  resize: vertical;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.tp-synthesis__input:focus {
+  outline: none;
+  border-color: var(--sc-roxo);
+  background: var(--sc-white);
+}
+
+.tp-synthesis__input[readonly] {
+  background: #f5f5f5;
+  resize: none;
+  cursor: default;
+}
+
+.tp-synthesis__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.tp-synthesis__footer .tp-question__save-feedback {
+  margin-top: 0;
+}
+
+.tp-synthesis__btn {
+  padding: 10px 22px;
+  background: var(--sc-roxo);
+  color: #fff;
+  border: none;
+  border-radius: var(--sc-radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.tp-synthesis__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Responsivo ────────────────────────────────────────────── */
 @media (max-width: 600px) {
+  .tp-synthesis { padding: 18px 16px; }
+  .tp-synthesis--journey { padding: 20px 16px; }
+  .tp-info-links { padding: 18px 16px; }
+  .tp-info-links__heading { flex-direction: column; }
+  .tp-info-links__grid { grid-template-columns: 1fr; }
+  .tp-info-link-card { gap: 8px; padding: 9px; }
+  .tp-info-link-card > a { padding: 7px; }
+  .tp-hero--information { padding: 22px 18px; }
   .tp-main { padding: 20px 16px 48px; }
   .tp-hero { flex-direction: column; align-items: flex-start; }
   .tp-hero__stats { margin-left: 0; align-items: flex-start; }

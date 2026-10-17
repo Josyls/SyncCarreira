@@ -8,19 +8,19 @@
  *
  * Dependências:
  *  - AuthContext: fornece a função login() e o estado loading
- *  - React Router: useNavigate para redirecionamento, Link para /cadastro
+ *  - React Router: useNavigate para redirecionamento
  *  - Footer: componente de rodapé reutilizável
  */
 
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import Footer from '../../components/Footer/Footer.jsx'
 import './LoginPage.css'
 
 /**
  * LoginPage
- * Página de login com campos de e-mail, senha e opção "Lembrar de mim".
+ * Página de login com campos de e-mail e senha e orientação de recuperação.
  *
  * @returns {JSX.Element}
  */
@@ -31,7 +31,6 @@ export default function LoginPage() {
   // ── Estados do formulário ────────────────────────────────────
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [lembrar, setLembrar]   = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [error, setError]       = useState('')
   const [showRecoverHint, setShowRecoverHint] = useState(false)
@@ -133,18 +132,8 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Linha: lembrar de mim + esqueceu a senha */}
+            {/* Orientação para recuperação de acesso */}
             <div className="lp-row">
-              <label className="lp-check">
-                <input
-                  type="checkbox"
-                  checked={lembrar}
-                  onChange={e => setLembrar(e.target.checked)}
-                />
-                <span>Lembrar de mim</span>
-              </label>
-              {/* O backend não tem endpoint de redefinição: as contas são criadas
-                  pelo administrador, então orientamos o usuário a procurá-lo. */}
               <button
                 type="button"
                 className="lp-link"
@@ -158,8 +147,8 @@ export default function LoginPage() {
 
             {showRecoverHint && (
               <p id="lp-recover-hint" className="lp-info" aria-live="polite">
-                Para redefinir sua senha, fale com a sua orientadora ou com o
-                administrador da sua escola/instituição.
+                Se você não conseguir acessar sua conta ou o link de primeiro acesso
+                tiver expirado, contate o administrador.
               </p>
             )}
 
@@ -169,11 +158,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Link para cadastro */}
-          <p className="lp-footer-text">
-            Não tem uma conta?{' '}
-            <Link to="/cadastro" className="lp-link">Criar conta</Link>
-          </p>
         </div>
 
         {/* Banner promocional */}

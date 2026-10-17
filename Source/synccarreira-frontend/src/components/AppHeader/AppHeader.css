@@ -65,5 +65,7 @@
 @media (max-width: 560px) {
   .sc-header { padding: 0 16px; gap: 12px; }
   .sc-header__name { display: none; }
-  .sc-header__link { padding: 7px 9px; }
+  .sc-header__nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .sc-header__nav::-webkit-scrollbar { display: none; }
+  .sc-header__link { flex: 0 0 auto; padding: 7px 9px; white-space: nowrap; }
 }

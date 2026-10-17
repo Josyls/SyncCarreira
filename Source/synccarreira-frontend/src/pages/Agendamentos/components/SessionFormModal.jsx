@@ -39,7 +39,17 @@ function todayISO() {
  * @param {Function} props.onSubmit    - async (form) => void
  * @param {Function} props.onClose
  */
-export default function SessionFormModal({ initial, students, loadingStudents, onSubmit, onClose }) {
+export default function SessionFormModal({
+  initial,
+  students,
+  loadingStudents,
+  doubtStudentsLoading,
+  doubtStudentsError,
+  doubtStudentCount,
+  onRetryDoubtStudents,
+  onSubmit,
+  onClose,
+}) {
   const editing = Boolean(initial)
   const { date: d0, time: t0 } = splitDateTime(initial?.dateTime)
 
@@ -52,25 +62,25 @@ export default function SessionFormModal({ initial, students, loadingStudents, o
   const [description, setDescription]   = useState(initial?.description ?? '')
   const [syncGoogle, setSyncGoogle]     = useState(isGoogleConfigured())
   const [search, setSearch]       = useState('')
+  const [onlyInDoubt, setOnlyInDoubt] = useState(false)
 
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState('')
 
-  // Alunos da sessão em edição que por algum motivo não vieram na lista
+  // A lista recebida já está limitada aos alunos da instituição da psicóloga.
   const allStudents = useMemo(() => {
-    const map = new Map(students.map(s => [s.id, s]))
-    initial?.students?.forEach(s => { if (!map.has(s.id)) map.set(s.id, s) })
-    return [...map.values()]
-  }, [students, initial])
+    return students
+  }, [students])
 
   const filtered = useMemo(() => {
+    const candidates = onlyInDoubt ? allStudents.filter(student => student.inDoubt) : allStudents
     const q = search.trim().toLowerCase()
-    if (!q) return allStudents
-    return allStudents.filter(s =>
+    if (!q) return candidates
+    return candidates.filter(s =>
       s.name?.toLowerCase().includes(q) ||
       s.email?.toLowerCase().includes(q) ||
       s.className?.toLowerCase().includes(q))
-  }, [allStudents, search])
+  }, [allStudents, search, onlyInDoubt])
 
   function changeType(type) {
     setScheduleType(type)
@@ -196,6 +206,30 @@ export default function SessionFormModal({ initial, students, loadingStudents, o
             {scheduleType === TYPES.GRUPO ? 'Alunos participantes' : 'Aluno'}
             {selectedIds.size > 0 && <em className="ag-label__count">{selectedIds.size} selecionado(s)</em>}
           </legend>
+
+          {!editing && (
+            <div className="ag-doubt-filter">
+              <label className="ag-doubt-filter__control">
+                <input
+                  type="checkbox"
+                  checked={onlyInDoubt}
+                  disabled={doubtStudentsLoading || Boolean(doubtStudentsError)}
+                  onChange={event => setOnlyInDoubt(event.target.checked)}
+                />
+                <span>Somente alunos em dúvida</span>
+                <span className="ag-doubt-filter__count">
+                  {doubtStudentsLoading ? 'Carregando…' : `${doubtStudentCount} sinalizado(s)`}
+                </span>
+              </label>
+            </div>
+          )}
+
+          {doubtStudentsError && (
+            <div className="ag-doubt-filter__error">
+              <span>{doubtStudentsError}</span>
+              <button type="button" className="ag-link" onClick={onRetryDoubtStudents}>Tentar novamente</button>
+            </div>
+          )}
 
           <input
             type="search"

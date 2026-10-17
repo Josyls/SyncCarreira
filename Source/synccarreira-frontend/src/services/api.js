@@ -84,7 +84,7 @@ api.interceptors.response.use(
       // Usamos window.location (e não navigate()) de propósito: este arquivo fica
       // fora da árvore do React, e o recarregamento zera o estado do AuthContext.
       localStorage.removeItem('token')
-      if (window.location.pathname !== '/login') {
+      if (!error.config?.suppressAuthRedirect && window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     }

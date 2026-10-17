@@ -3,7 +3,7 @@
  * @description Contexto global de autenticação do SyncCarreira.
  *
  * Ajustado para o contrato real do backend:
- *  - Salva userId no localStorage após login/cadastro (necessário para GET /users/{id})
+ *  - Restaura os dados do usuário autenticado via GET /users/me
  *  - Normaliza campos: backend usa `name`, frontend usa `nome`
  *  - authService.me() agora chama GET /users/{id}
  */
