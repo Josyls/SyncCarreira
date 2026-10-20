@@ -2,6 +2,7 @@ package com.synccarreira.synccarreira_api.services;
 
 import com.synccarreira.synccarreira_api.services.exceptions.EmailException;
 import jakarta.mail.Session;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import org.junit.jupiter.api.Assertions;
@@ -15,6 +16,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
@@ -36,12 +38,17 @@ public class EmailServiceTests {
     @Mock
     private SpringTemplateEngine thymeleafTemplateEngine;
 
-    private String validEmail, invalidEmail, subject, htmlBody, templateName;
+    private String validEmail, invalidEmail, subject, htmlBody, templateName, fromAddress, fromName;
     private Map<String, Object> templateModel;
     private MimeMessage mimeMessage;
 
     @BeforeEach
     void setUp() {
+        fromAddress = "contato@synccarreira.com.br";
+        fromName = "SyncCarreira";
+        ReflectionTestUtils.setField(service, "fromAddress", fromAddress);
+        ReflectionTestUtils.setField(service, "fromName", fromName);
+
         validEmail = "ana.souza@gmail.com";
         invalidEmail = "Ana Souza <ana.souza@gmail.com";
         subject = "SyncCarreira - Primeiro Acesso";
@@ -57,16 +64,21 @@ public class EmailServiceTests {
     }
 
     @Test
-    void sendHtmlMessageShouldSendMimeMessageWithRecipientSubjectAndHtmlBody() throws Exception {
+    void sendHtmlMessageShouldSendMimeMessageWithSenderRecipientSubjectAndHtmlAndPlainTextBodies() throws Exception {
         Mockito.when(emailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         service.sendHtmlMessage(validEmail, subject, htmlBody);
 
         Mockito.verify(emailSender).send(mimeMessage);
+        Assertions.assertEquals(1, mimeMessage.getFrom().length);
+        InternetAddress from = (InternetAddress) mimeMessage.getFrom()[0];
+        Assertions.assertEquals(fromAddress, from.getAddress());
+        Assertions.assertEquals(fromName, from.getPersonal());
         Assertions.assertEquals(1, mimeMessage.getAllRecipients().length);
         Assertions.assertEquals(validEmail, mimeMessage.getAllRecipients()[0].toString());
         Assertions.assertEquals(subject, mimeMessage.getSubject());
         Assertions.assertEquals(htmlBody, extractHtmlBody(mimeMessage));
+        Assertions.assertEquals("Olá, Ana Souza!", extractPlainTextBody(mimeMessage));
     }
 
     @Test
@@ -123,9 +135,33 @@ public class EmailServiceTests {
         });
     }
 
+    @Test
+    void toPlainTextShouldConvertHtmlIntoReadableTextKeepingLinksAndListItems() {
+        String html = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\" /></head><body>"
+                + "<p>Ol&aacute;, Ana &amp; Jo&#227;o!</p>\n"
+                + "<p>Acesse   este link <a href=\"https://synccarreira.com.br/new-password?token=abc\">definir senha</a></p>\n"
+                + "<ul>\n  <li>Nome: Ana</li>\n  <li>Turma: 3A</li>\n</ul>\n"
+                + "<p>Time SyncCarreira</p></body></html>";
+
+        String result = EmailService.toPlainText(html);
+
+        Assertions.assertEquals("Olá, Ana & João!\n\n"
+                + "Acesse este link definir senha (https://synccarreira.com.br/new-password?token=abc)\n\n"
+                + "- Nome: Ana\n- Turma: 3A\n\n"
+                + "Time SyncCarreira", result);
+    }
+
     private String extractHtmlBody(MimeMessage message) throws Exception {
+        return (String) extractAlternativeMultipart(message).getBodyPart(1).getContent();
+    }
+
+    private String extractPlainTextBody(MimeMessage message) throws Exception {
+        return (String) extractAlternativeMultipart(message).getBodyPart(0).getContent();
+    }
+
+    private MimeMultipart extractAlternativeMultipart(MimeMessage message) throws Exception {
         MimeMultipart rootMultipart = (MimeMultipart) message.getContent();
         MimeMultipart relatedMultipart = (MimeMultipart) rootMultipart.getBodyPart(0).getContent();
-        return (String) relatedMultipart.getBodyPart(0).getContent();
+        return (MimeMultipart) relatedMultipart.getBodyPart(0).getContent();
     }
 }
