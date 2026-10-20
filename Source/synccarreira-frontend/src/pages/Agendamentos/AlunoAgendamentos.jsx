@@ -14,6 +14,19 @@ import {
   getStudentAppointments, displayStatus, formatSessionDate, isHappeningSoon, USE_MOCK,
 } from '../../services/appointmentService'
 import { buildAddToCalendarUrl } from '../../services/googleCalendarService'
+import { getMyFeedbacks, markFeedbackAsRead, FEEDBACK_TYPE_LABEL } from '../../services/feedbackService'
+
+/** Linha de contexto do feedback: "Sessão · Conversa X · 12 de outubro" ou "Fim de jornada · Jornada nº 1". */
+function feedbackContext(feedback) {
+  const type = FEEDBACK_TYPE_LABEL[feedback.type] ?? 'Feedback'
+  if (feedback.type === 'JORNADA') {
+    return feedback.journeyNumber ? `${type} · Jornada nº ${feedback.journeyNumber}` : type
+  }
+  const when = feedback.appointmentDateTime
+    ? new Date(feedback.appointmentDateTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+    : ''
+  return [type, feedback.appointmentTitle, when].filter(Boolean).join(' · ')
+}
 
 function timeUntil(dateTime) {
   const diff = new Date(dateTime).getTime() - Date.now()
@@ -92,13 +105,27 @@ export default function AlunoAgendamentos() {
 
   useEffect(() => { load() }, [load])
 
-  const { next, upcoming, history, feedbacks } = useMemo(() => {
+  // Feedbacks recebidos (RF-16): sessão e fim de jornada. Os novos são marcados como lidos ao abrir a tela.
+  const [feedbacks, setFeedbacks] = useState([])
+  const [feedbackError, setFeedbackError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    getMyFeedbacks()
+      .then(list => {
+        if (!active) return
+        setFeedbacks(list)
+        list.filter(feedback => !feedback.read)
+          .forEach(feedback => { markFeedbackAsRead(feedback.id).catch(() => undefined) })
+      })
+      .catch(err => { if (active) setFeedbackError(err.message) })
+    return () => { active = false }
+  }, [])
+
+  const { next, upcoming, history } = useMemo(() => {
     const up   = appointments.filter(a => displayStatus(a) === 'AGENDADA')
     const hist = appointments.filter(a => displayStatus(a) !== 'AGENDADA').reverse()
-    const fb   = appointments
-      .filter(a => a.feedback)
-      .sort((a, b) => new Date(b.feedbackDate || b.dateTime) - new Date(a.feedbackDate || a.dateTime))
-    return { next: up[0] ?? null, upcoming: up.slice(1), history: hist, feedbacks: fb }
+    return { next: up[0] ?? null, upcoming: up.slice(1), history: hist }
   }, [appointments])
 
   return (
@@ -157,24 +184,25 @@ export default function AlunoAgendamentos() {
           {/* Feedbacks */}
           <section className="ag-section">
             <h2 className="ag-h2">Feedbacks da orientadora</h2>
-            {feedbacks.length === 0 ? (
-              <div className="ag-empty">Depois das sessões, os feedbacks da sua orientadora aparecem aqui.</div>
-            ) : (
+            {feedbackError && <div className="ag-state ag-state--error">{feedbackError}</div>}
+            {!feedbackError && feedbacks.length === 0 && (
+              <div className="ag-empty">Depois das sessões e ao final da jornada, os feedbacks da sua orientadora aparecem aqui.</div>
+            )}
+            {feedbacks.length > 0 && (
               <div className="ag-list">
-                {feedbacks.map(a => (
-                  <article key={a.id} className="ag-feedback">
+                {feedbacks.map(feedback => (
+                  <article key={feedback.id} className="ag-feedback">
                     <header className="ag-feedback__head">
                       <span className="ag-feedback__avatar" aria-hidden="true">
-                        {(a.psychologist?.name ?? 'O').charAt(0).toUpperCase()}
+                        {(feedback.psychologistName ?? 'O').charAt(0).toUpperCase()}
                       </span>
                       <div>
-                        <strong>{a.psychologist?.name ?? 'Sua orientadora'}</strong>
-                        <span className="ag-feedback__meta">
-                          {a.title || 'Sessão'} · {new Date(a.dateTime).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
-                        </span>
+                        <strong>{feedback.psychologistName ?? 'Sua orientadora'}</strong>
+                        <span className="ag-feedback__meta">{feedbackContext(feedback)}</span>
                       </div>
+                      {!feedback.read && <span className="ag-badge ag-badge--agendada ag-feedback__new">Novo</span>}
                     </header>
-                    <p className="ag-feedback__text">{a.feedback}</p>
+                    <p className="ag-feedback__text">{feedback.content}</p>
                   </article>
                 ))}
               </div>

@@ -13,6 +13,11 @@ export default function CancelModal({ appointment, onConfirm, onClose }) {
   const [error, setError]   = useState('')
 
   async function handleConfirm() {
+    // O backend exige o motivo (AppointmentCancelDTO.cancelReason é @NotBlank)
+    if (!reason.trim()) {
+      setError('Informe o motivo do cancelamento. Ele aparece para o aluno.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -46,12 +51,14 @@ export default function CancelModal({ appointment, onConfirm, onClose }) {
           : 'A sessão ficará marcada como cancelada na área do aluno.'}
       </p>
       <div className="ag-field">
-        <label className="ag-label" htmlFor="ag-cancel-reason">Motivo <em>(opcional, visível para o aluno)</em></label>
+        <label className="ag-label" htmlFor="ag-cancel-reason">Motivo <em>(visível para o aluno)</em></label>
         <textarea
           id="ag-cancel-reason"
           className="ag-input ag-textarea"
           rows={3}
           maxLength={300}
+          required
+          placeholder="Ex.: Precisei remarcar por um compromisso na escola. Vou enviar um novo horário."
           value={reason}
           onChange={e => setReason(e.target.value)}
         />

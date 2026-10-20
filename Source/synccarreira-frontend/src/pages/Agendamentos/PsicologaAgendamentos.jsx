@@ -20,8 +20,9 @@ import CancelModal from './components/CancelModal.jsx'
 import FeedbackModal from './components/FeedbackModal.jsx'
 import {
   getPsychologistAppointments, createAppointment, updateAppointment,
-  cancelAppointment, sendFeedback, displayStatus, USE_MOCK,
+  cancelAppointment, displayStatus, USE_MOCK,
 } from '../../services/appointmentService'
+import { getSentFeedbacks, sendSessionFeedback, deleteFeedback } from '../../services/feedbackService'
 import { getPsychologistPanel } from '../../services/psychologistPanelService'
 import {
   isGoogleConfigured, isGoogleConnected, connectGoogle, disconnectGoogle,
@@ -40,11 +41,65 @@ function rollbackGoogleEvent(googleEventId) {
   return cancelMeetEvent(googleEventId).catch(() => undefined)
 }
 
+/**
+ * Atalhos vindos do painel: ?aluno=ID abre "Nova sessão" com o aluno marcado,
+ * ?nova=1 abre "Nova sessão" vazia.
+ * @returns {Object|null} estado inicial do modal
+ */
+function readInitialModalFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const studentId = Number(params.get('aluno'))
+  const openNew = params.get('nova') === '1'
+  if (!studentId && !openNew) return null
+  return { type: 'form', preselectedStudentIds: studentId ? [studentId] : [] }
+}
+
+/** Remove os atalhos da URL, para não reabrir o formulário ao recarregar a página. */
+function clearShortcutParams() {
+  const params = new URLSearchParams(window.location.search)
+  if (!params.has('aluno') && !params.has('nova')) return
+  params.delete('aluno')
+  params.delete('nova')
+  const query = params.toString()
+  window.history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : ''))
+}
+
+/** Agrupa os feedbacks de sessão por agendamento: { [appointmentId]: { [studentId]: feedback } } */
+function groupSessionFeedbacks(feedbacks) {
+  const byAppointment = {}
+  feedbacks
+    .filter(feedback => feedback.type === 'SESSAO' && feedback.appointmentId)
+    .forEach(feedback => {
+      byAppointment[feedback.appointmentId] ??= {}
+      byAppointment[feedback.appointmentId][feedback.studentId] = feedback
+    })
+  return byAppointment
+}
+
 const TABS = [
   { id: 'AGENDADA',  label: 'Próximas'   },
   { id: 'REALIZADA', label: 'Realizadas' },
   { id: 'CANCELADA', label: 'Canceladas' },
 ]
+
+/** Botão de feedback de uma sessão realizada, com quantos participantes já receberam. */
+function SessionFeedbackActions({ sent, total, onOpen }) {
+  const done = sent === total
+  let label = 'Enviar feedback'
+  if (done) label = 'Ver feedbacks'
+  else if (sent > 0) label = 'Continuar feedbacks'
+
+  return (
+    <>
+      <button className={`ag-btn ag-btn--sm ${done ? 'ag-btn--outline' : 'ag-btn--primary'}`} onClick={onOpen}>
+        {label}
+      </button>
+      <span className={done ? 'ag-card__ok' : 'ag-muted-sm'}>
+        {done ? '✓ ' : ''}{sent} de {total} feedback(s) enviado(s)
+      </span>
+    </>
+  )
+}
 
 export default function PsicologaAgendamentos() {
   const { user } = useAuth()
@@ -69,8 +124,12 @@ export default function PsicologaAgendamentos() {
   const [googleMsg, setGoogleMsg] = useState('')
   const [toast, setToast]         = useState('')
 
-  // Modais: { type: 'form'|'cancel'|'feedback', appointment? }
-  const [modal, setModal] = useState(null)
+  // Feedbacks individuais de sessão já enviados (RF-09)
+  const [sentFeedbacks, setSentFeedbacks] = useState([])
+
+  // Modais: { type: 'form'|'cancel'|'feedback', appointment?, preselectedStudentIds? }
+  const [modal, setModal] = useState(readInitialModalFromUrl)
+  useEffect(() => { clearShortcutParams() }, [])
 
   // ── Carregamento ────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -86,6 +145,16 @@ export default function PsicologaAgendamentos() {
   }, [psychologist.id])
 
   useEffect(() => { load() }, [load])
+
+  const loadSentFeedbacks = useCallback(async () => {
+    try {
+      setSentFeedbacks(await getSentFeedbacks())
+    } catch {
+      setSentFeedbacks([]) // a lista de sessões continua funcionando sem essa informação
+    }
+  }, [])
+
+  useEffect(() => { void loadSentFeedbacks() }, [loadSentFeedbacks])
 
   useEffect(() => {
     preloadGoogle()
@@ -211,10 +280,15 @@ export default function PsicologaAgendamentos() {
     setToast('Sessão cancelada. Os alunos foram avisados.')
   }
 
-  async function handleSaveFeedback(text) {
-    replaceInList(await sendFeedback(modal.appointment.id, text))
-    setModal(null)
-    setToast('Feedback enviado. Ele já aparece na área do aluno.')
+  async function handleSendSessionFeedback(studentId, content) {
+    const created = await sendSessionFeedback({ appointmentId: modal.appointment.id, studentId, content })
+    setSentFeedbacks(list => [created, ...list])
+    setToast('Feedback enviado. O aluno foi avisado por e-mail.')
+  }
+
+  async function handleDeleteFeedback(feedbackId) {
+    await deleteFeedback(feedbackId)
+    setSentFeedbacks(list => list.filter(feedback => feedback.id !== feedbackId))
   }
 
   // ── Agrupamento por aba ─────────────────────────────────────
@@ -226,7 +300,10 @@ export default function PsicologaAgendamentos() {
     return g
   }, [appointments])
 
-  const pendingFeedback = grouped.REALIZADA.filter(a => !a.feedback).length
+  const feedbacksByAppointment = useMemo(() => groupSessionFeedbacks(sentFeedbacks), [sentFeedbacks])
+  const sentCountOf = appointment => appointment.students
+    .filter(student => feedbacksByAppointment[appointment.id]?.[student.id]).length
+  const pendingFeedback = grouped.REALIZADA.filter(a => sentCountOf(a) < a.students.length).length
   const visible = grouped[tab]
   const doubtStudentIds = new Set(doubtStudents.map(student => student.studentId))
   const studentsWithDoubtStatus = students.filter(student => institutionStudentIds?.has(student.id)).map(student => ({
@@ -279,7 +356,7 @@ export default function PsicologaAgendamentos() {
       {USE_MOCK && (
         <div className="ag-note">
           Modo demonstração: os agendamentos estão sendo salvos só neste navegador
-          (<code>VITE_APPOINTMENTS_MOCK=true</code>) até o backend expor <code>/appointments</code>.
+          (<code>VITE_APPOINTMENTS_MOCK=true</code>). Remova essa variável do .env para usar o backend.
         </div>
       )}
 
@@ -337,15 +414,11 @@ export default function PsicologaAgendamentos() {
               </>
             )}
             {tab === 'REALIZADA' && (
-              <>
-                <button
-                  className={`ag-btn ag-btn--sm ${a.feedback ? 'ag-btn--outline' : 'ag-btn--primary'}`}
-                  onClick={() => setModal({ type: 'feedback', appointment: a })}
-                >
-                  {a.feedback ? 'Editar feedback' : 'Enviar feedback'}
-                </button>
-                {a.feedback && <span className="ag-card__ok">✓ Feedback enviado</span>}
-              </>
+              <SessionFeedbackActions
+                sent={sentCountOf(a)}
+                total={a.students.length}
+                onOpen={() => setModal({ type: 'feedback', appointment: a })}
+              />
             )}
           </SessionCard>
         ))}
@@ -361,6 +434,7 @@ export default function PsicologaAgendamentos() {
           doubtStudentsError={doubtError}
           doubtStudentCount={doubtStudents.length}
           onRetryDoubtStudents={loadDoubtStudents}
+          preselectedStudentIds={modal.preselectedStudentIds}
           onSubmit={handleSaveSession}
           onClose={() => setModal(null)}
         />
@@ -375,7 +449,9 @@ export default function PsicologaAgendamentos() {
       {modal?.type === 'feedback' && (
         <FeedbackModal
           appointment={modal.appointment}
-          onSave={handleSaveFeedback}
+          sentByStudent={feedbacksByAppointment[modal.appointment.id] ?? {}}
+          onSend={handleSendSessionFeedback}
+          onDelete={handleDeleteFeedback}
           onClose={() => setModal(null)}
         />
       )}
