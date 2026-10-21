@@ -47,6 +47,7 @@ export default function SessionFormModal({
   doubtStudentsError,
   doubtStudentCount,
   onRetryDoubtStudents,
+  preselectedStudentIds = [],
   onSubmit,
   onClose,
 }) {
@@ -54,7 +55,9 @@ export default function SessionFormModal({
   const { date: d0, time: t0 } = splitDateTime(initial?.dateTime)
 
   const [scheduleType, setScheduleType] = useState(initial?.scheduleType ?? TYPES.INDIVIDUAL)
-  const [selectedIds, setSelectedIds]   = useState(() => new Set(initial?.students?.map(s => s.id) ?? []))
+  const [selectedIds, setSelectedIds]   = useState(
+    () => new Set(initial?.students?.map(s => s.id) ?? preselectedStudentIds)
+  )
   const [title, setTitle]         = useState(initial?.title ?? '')
   const [date, setDate]           = useState(d0)
   const [time, setTime]           = useState(t0)
@@ -114,6 +117,8 @@ export default function SessionFormModal({
     if (scheduleType === TYPES.GRUPO && chosen.length < 2) {
       return setError('Uma sessão em grupo precisa de pelo menos 2 alunos.')
     }
+    // O backend exige título (AppointmentInsertDTO.title é @NotBlank)
+    if (!title.trim()) return setError('Informe o título da sessão.')
     if (!date || !time) return setError('Informe a data e o horário da sessão.')
 
     const dateTime = `${date}T${time}:00`
@@ -275,11 +280,12 @@ export default function SessionFormModal({
 
         {/* Título */}
         <div className="ag-field">
-          <label className="ag-label" htmlFor="ag-title">Título <em>(opcional)</em></label>
+          <label className="ag-label" htmlFor="ag-title">Título</label>
           <input
             id="ag-title"
             className="ag-input"
             maxLength={120}
+            required
             placeholder={scheduleType === TYPES.GRUPO ? 'Ex.: Roda de conversa — Plano de futuro' : 'Ex.: Conversa sobre a trilha Autoconhecimento'}
             value={title}
             onChange={e => setTitle(e.target.value)}

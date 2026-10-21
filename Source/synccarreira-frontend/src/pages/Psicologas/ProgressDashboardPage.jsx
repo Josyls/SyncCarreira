@@ -1,7 +1,31 @@
+/**
+ * @file ProgressDashboardPage.jsx
+ * @description Painel da psicóloga/orientadora.
+ *
+ *  - RF-04: alertas de alunos que concluíram as trilhas com dúvida/indecisão
+ *  - RF-05: progresso das turmas e dos alunos por etapa
+ *  - RF-07: relatório da turma e relatórios individuais (.xlsx)
+ *  - RF-08: próximas sessões e atalho para agendar (inclusive a partir de um alerta)
+ *  - RF-09: feedback de fim de jornada e histórico de feedbacks enviados
+ */
+
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppHeader from '../../components/AppHeader/AppHeader.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getPsychologistPanel } from '../../services/psychologistPanelService.js'
+import {
+  getPsychologistPanel, downloadClassReport, downloadStudentReport,
+} from '../../services/psychologistPanelService.js'
+import {
+  getFeedbackStatus, getSentFeedbacks, sendJourneyFeedback, deleteFeedback,
+} from '../../services/feedbackService.js'
+import { getPsychologistAppointments } from '../../services/appointmentService.js'
+import GuidanceAlerts from './Panel/GuidanceAlerts.jsx'
+import ReportsPanel from './Panel/ReportsPanel.jsx'
+import UpcomingSessions from './Panel/UpcomingSessions.jsx'
+import SentFeedbacks from './Panel/SentFeedbacks.jsx'
+import JourneyFeedbackModal from './Panel/JourneyFeedbackModal.jsx'
+import '../Agendamentos/Agendamentos.css'
 import './ProgressDashboardPage.css'
 
 const JOURNEY_LABELS = {
@@ -52,8 +76,30 @@ function MetricCard({ label, value, note, tone }) {
   )
 }
 
-function StudentDetails({ student }) {
+/** Situação do feedback de jornada de um aluno (coluna "Feedback"). */
+function FeedbackCell({ status, onSend }) {
+  if (!status) return <span className="pd-table__sub">—</span>
+  const sessionInfo = status.sessionFeedbacksSent > 0
+    ? <span className="pd-table__sub">{status.sessionFeedbacksSent} de sessão</span>
+    : null
+
+  if (status.journeyFeedbackSent) {
+    return <><span className="pd-feedback-ok">✓ Jornada</span>{sessionInfo}</>
+  }
+  if (!status.concludedJourneys) {
+    return <><span className="pd-table__sub">Jornada não concluída</span>{sessionInfo}</>
+  }
+  return (
+    <>
+      <button type="button" className="pd-expand pd-expand--strong" onClick={onSend}>Enviar feedback</button>
+      {sessionInfo}
+    </>
+  )
+}
+
+function StudentDetails({ student, feedbackStatus, onReport, onFeedback, onSchedule }) {
   const synthesisStatus = getSynthesisStatus(student)
+  const canSendJourneyFeedback = feedbackStatus?.concludedJourneys > 0 && !feedbackStatus?.journeyFeedbackSent
   return (
     <div className="pd-details">
       <div className="pd-details__heading">
@@ -84,12 +130,57 @@ function StudentDetails({ student }) {
           <p className="pd-stage__count">{student.finalSynthesisSubmitted ? 'Síntese enviada' : 'A síntese final ainda não foi enviada'}</p>
         </div>
       </div>
+      <div className="pd-details__actions">
+        <button type="button" className="ag-btn ag-btn--outline ag-btn--sm" onClick={onReport}>Baixar relatório individual</button>
+        {canSendJourneyFeedback && (
+          <button type="button" className="ag-btn ag-btn--outline ag-btn--sm" onClick={onFeedback}>Enviar feedback da jornada</button>
+        )}
+        <button type="button" className="ag-btn ag-btn--primary ag-btn--sm" onClick={onSchedule}>Agendar sessão</button>
+      </div>
     </div>
+  )
+}
+
+/** Linha da tabela de alunos (+ linha de detalhes quando expandida). */
+function StudentRow({ student, expanded, feedbackStatus, reportBusy, onToggle, onReport, onFeedback, onSchedule }) {
+  return (
+    <Fragment>
+      <tr>
+        <td><strong>{student.studentName}</strong>{student.inDoubt && <span className="pd-table__flag">Em dúvida</span>}</td>
+        <td>{student.schoolClassName || 'Sem turma'}</td>
+        <td>{TRAIL_LABELS[student.currentTrail] ?? student.currentTrail ?? 'Jornada concluída'}</td>
+        <td><strong>{student.progressPercentage}%</strong><span className="pd-table__sub">{student.answeredQuestions}/{student.totalQuestions} perguntas</span></td>
+        <td><StatusPill status={student.journeyStatus} label={statusLabel(student.journeyStatus)} /></td>
+        <td><FeedbackCell status={feedbackStatus} onSend={onFeedback} /></td>
+        <td className="pd-table__actions">
+          <button className="pd-expand" type="button" onClick={onReport} disabled={reportBusy} aria-label={`Baixar relatório de ${student.studentName}`}>
+            {reportBusy ? 'Gerando…' : 'Relatório'}
+          </button>
+          <button className="pd-expand" type="button" aria-expanded={expanded} onClick={onToggle}>
+            {expanded ? 'Fechar' : 'Detalhes'}
+          </button>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td className="pd-table__details-cell" colSpan="7">
+            <StudentDetails
+              student={student}
+              feedbackStatus={feedbackStatus}
+              onReport={onReport}
+              onFeedback={onFeedback}
+              onSchedule={onSchedule}
+            />
+          </td>
+        </tr>
+      )}
+    </Fragment>
   )
 }
 
 export default function ProgressDashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [panel, setPanel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -97,6 +188,21 @@ export default function ProgressDashboardPage() {
   const [classFilter, setClassFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [expandedStudentId, setExpandedStudentId] = useState(null)
+
+  // RF-09: situação e histórico dos feedbacks
+  const [feedbackStatus, setFeedbackStatus] = useState([])
+  const [sentFeedbacks, setSentFeedbacks] = useState([])
+  const [feedbackError, setFeedbackError] = useState('')
+  const [feedbackTarget, setFeedbackTarget] = useState(null) // aluno do modal de feedback de jornada
+
+  // RF-08: sessões
+  const [appointments, setAppointments] = useState([])
+  const [loadingAppointments, setLoadingAppointments] = useState(true)
+  const [appointmentsError, setAppointmentsError] = useState('')
+
+  // RF-07: download individual em andamento
+  const [reportBusyId, setReportBusyId] = useState(null)
+  const [toast, setToast] = useState('')
 
   const loadPanel = useCallback(async () => {
     if (!user?.id) return
@@ -111,9 +217,50 @@ export default function ProgressDashboardPage() {
     }
   }, [user?.id])
 
-  useEffect(() => { void loadPanel() }, [loadPanel])
+  const loadFeedbacks = useCallback(async () => {
+    if (!user?.id) return
+    setFeedbackError('')
+    try {
+      const [status, sent] = await Promise.all([getFeedbackStatus(user.id), getSentFeedbacks()])
+      setFeedbackStatus(status)
+      setSentFeedbacks(sent)
+    } catch (loadError) {
+      setFeedbackError(loadError.message)
+    }
+  }, [user?.id])
 
-  const students = panel?.students ?? []
+  const loadAppointments = useCallback(async () => {
+    if (!user?.id) return
+    setLoadingAppointments(true)
+    setAppointmentsError('')
+    try {
+      setAppointments(await getPsychologistAppointments(user.id))
+    } catch (loadError) {
+      setAppointmentsError(loadError.message)
+    } finally {
+      setLoadingAppointments(false)
+    }
+  }, [user?.id])
+
+  const refreshAll = useCallback(() => {
+    void loadPanel()
+    void loadFeedbacks()
+    void loadAppointments()
+  }, [loadPanel, loadFeedbacks, loadAppointments])
+
+  useEffect(() => { refreshAll() }, [refreshAll])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = setTimeout(() => setToast(''), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  const students = useMemo(() => panel?.students ?? [], [panel])
+  const feedbackStatusById = useMemo(
+    () => Object.fromEntries(feedbackStatus.map(item => [item.studentId, item])),
+    [feedbackStatus]
+  )
   const classes = useMemo(() => [...new Set(students.map(student => student.schoolClassName).filter(Boolean))]
     .sort((first, second) => first.localeCompare(second, 'pt-BR')), [students])
   const filteredStudents = useMemo(() => {
@@ -142,6 +289,53 @@ export default function ProgressDashboardPage() {
 
   const attentionStudents = students.filter(student => student.inDoubt)
 
+  // ── Ações ────────────────────────────────────────────────────
+  function scheduleWith(student) {
+    navigate(`/agendamentos?aluno=${student.studentId}`)
+  }
+
+  function showStudent(student) {
+    setQuery('')
+    setClassFilter('')
+    setStatusFilter('')
+    setExpandedStudentId(student.studentId)
+    requestAnimationFrame(() => document.getElementById('pd-students-title')?.scrollIntoView({ behavior: 'smooth' }))
+  }
+
+  async function handleStudentReport(student) {
+    setReportBusyId(student.studentId)
+    try {
+      const fileName = await downloadStudentReport(user.id, student.studentId, student.studentName)
+      setToast(`Download iniciado: ${fileName}`)
+    } catch (downloadError) {
+      setToast(downloadError.message)
+    } finally {
+      setReportBusyId(null)
+    }
+  }
+
+  async function handleSendJourneyFeedback(content) {
+    const created = await sendJourneyFeedback({ studentId: feedbackTarget.studentId, content })
+    setSentFeedbacks(list => [created, ...list])
+    setFeedbackStatus(list => list.map(item => (
+      item.studentId === feedbackTarget.studentId ? { ...item, journeyFeedbackSent: true } : item
+    )))
+    setFeedbackTarget(null)
+    setToast('Feedback enviado. O aluno foi avisado por e-mail.')
+  }
+
+  async function handleDeleteFeedback(feedback) {
+    await deleteFeedback(feedback.id)
+    setSentFeedbacks(list => list.filter(item => item.id !== feedback.id))
+    setFeedbackStatus(list => list.map(item => {
+      if (item.studentId !== feedback.studentId) return item
+      return feedback.type === 'JORNADA'
+        ? { ...item, journeyFeedbackSent: false }
+        : { ...item, sessionFeedbacksSent: Math.max(0, item.sessionFeedbacksSent - 1) }
+    }))
+    setToast('Feedback apagado.')
+  }
+
   return (
     <div className="pd-page">
       <AppHeader />
@@ -150,9 +344,9 @@ export default function ProgressDashboardPage() {
           <div>
             <span className="pd-eyebrow">ACOMPANHAMENTO DA JORNADA</span>
             <h1>Painel de progresso</h1>
-            <p>Visão geral das trilhas dos alunos da sua instituição.</p>
+            <p>Visão geral das trilhas, alertas, relatórios e feedbacks dos alunos da sua instituição.</p>
           </div>
-          <button className="pd-refresh" type="button" onClick={loadPanel} disabled={loading}>
+          <button className="pd-refresh" type="button" onClick={refreshAll} disabled={loading}>
             {loading ? 'Atualizando…' : 'Atualizar painel'}
           </button>
         </header>
@@ -171,8 +365,30 @@ export default function ProgressDashboardPage() {
               <MetricCard label="Alunos acompanhados" value={panel.totalStudents} note="na sua instituição" tone="purple" />
               <MetricCard label="Jornadas iniciadas" value={panel.inProgressStudents} note="com respostas registradas" tone="blue" />
               <MetricCard label="Jornadas concluídas" value={panel.concludedStudents} note="inclui a síntese final" tone="green" />
-              <MetricCard label="Em dúvida" value={panel.inDoubtStudents} note="sinalizaram que precisam conversar" tone="amber" />
+              <MetricCard label="Em dúvida" value={panel.inDoubtStudents} note="precisam de orientação" tone="amber" />
             </section>
+
+            <GuidanceAlerts
+              students={attentionStudents}
+              feedbackStatusById={feedbackStatusById}
+              onSchedule={scheduleWith}
+              onFeedback={student => setFeedbackTarget(student)}
+              onDetails={showStudent}
+            />
+
+            <div className="pd-grid">
+              <UpcomingSessions
+                appointments={appointments}
+                loading={loadingAppointments}
+                error={appointmentsError}
+                onOpenSchedule={() => navigate('/agendamentos')}
+                onNewSession={() => navigate('/agendamentos?nova=1')}
+              />
+              <ReportsPanel
+                students={students}
+                onDownload={(classId, className) => downloadClassReport(user.id, classId, className)}
+              />
+            </div>
 
             <section className="pd-panel" aria-labelledby="pd-stage-title">
               <div className="pd-section-heading">
@@ -193,26 +409,9 @@ export default function ProgressDashboardPage() {
               ) : <p className="pd-empty-inline">Ainda não há alunos para exibir.</p>}
             </section>
 
-            {attentionStudents.length > 0 && (
-              <section className="pd-attention" aria-labelledby="pd-attention-title">
-                <div className="pd-attention__icon" aria-hidden="true">!</div>
-                <div className="pd-attention__body">
-                  <h2 id="pd-attention-title">Alunos que sinalizaram dúvida</h2>
-                  <p>Esses alunos indicaram que gostariam de conversar sobre a escolha profissional.</p>
-                  <div className="pd-attention__list">
-                    {attentionStudents.map(student => (
-                      <button key={student.studentId} type="button" onClick={() => setExpandedStudentId(student.studentId)}>
-                        {student.studentName}<span>{TRAIL_LABELS[student.currentTrail] ?? student.currentTrail ?? 'Jornada concluída'}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            )}
-
             <section className="pd-panel pd-students" aria-labelledby="pd-students-title">
               <div className="pd-section-heading pd-students__heading">
-                <div><h2 id="pd-students-title">Progresso dos alunos</h2><p>Consulte o andamento individual por trilha.</p></div>
+                <div><h2 id="pd-students-title">Progresso dos alunos</h2><p>Andamento individual, feedback e relatório de cada aluno.</p></div>
                 <span className="pd-result-count">{filteredStudents.length} de {students.length} alunos</span>
               </div>
               <div className="pd-filters">
@@ -224,29 +423,42 @@ export default function ProgressDashboardPage() {
               {filteredStudents.length ? (
                 <div className="pd-table-wrap">
                   <table className="pd-table">
-                    <thead><tr><th>Aluno</th><th>Turma</th><th>Etapa atual</th><th>Progresso</th><th>Status</th><th><span className="pd-sr-only">Detalhes</span></th></tr></thead>
+                    <thead><tr><th>Aluno</th><th>Turma</th><th>Etapa atual</th><th>Progresso</th><th>Status</th><th>Feedback</th><th><span className="pd-sr-only">Ações</span></th></tr></thead>
                     <tbody>
                       {filteredStudents.map(student => (
-                        <Fragment key={student.studentId}>
-                          <tr key={student.studentId}>
-                            <td><strong>{student.studentName}</strong>{student.inDoubt && <span className="pd-table__flag">Em dúvida</span>}</td>
-                            <td>{student.schoolClassName || 'Sem turma'}</td>
-                            <td>{TRAIL_LABELS[student.currentTrail] ?? student.currentTrail ?? 'Jornada concluída'}</td>
-                            <td><strong>{student.progressPercentage}%</strong><span className="pd-table__sub">{student.answeredQuestions}/{student.totalQuestions} perguntas</span></td>
-                            <td><StatusPill status={student.journeyStatus} label={statusLabel(student.journeyStatus)} /></td>
-                            <td><button className="pd-expand" type="button" aria-expanded={expandedStudentId === student.studentId} onClick={() => setExpandedStudentId(current => current === student.studentId ? null : student.studentId)}>{expandedStudentId === student.studentId ? 'Fechar' : 'Detalhes'}</button></td>
-                          </tr>
-                          {expandedStudentId === student.studentId && <tr key={`${student.studentId}-details`}><td className="pd-table__details-cell" colSpan="6"><StudentDetails student={student} /></td></tr>}
-                        </Fragment>
+                        <StudentRow
+                          key={student.studentId}
+                          student={student}
+                          expanded={expandedStudentId === student.studentId}
+                          feedbackStatus={feedbackStatusById[student.studentId]}
+                          reportBusy={reportBusyId === student.studentId}
+                          onToggle={() => setExpandedStudentId(current => (current === student.studentId ? null : student.studentId))}
+                          onReport={() => handleStudentReport(student)}
+                          onFeedback={() => setFeedbackTarget(student)}
+                          onSchedule={() => scheduleWith(student)}
+                        />
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : <p className="pd-empty-inline">Nenhum aluno corresponde aos filtros escolhidos.</p>}
             </section>
+
+            <SentFeedbacks feedbacks={sentFeedbacks} error={feedbackError} onDelete={handleDeleteFeedback} />
           </>
         )}
       </main>
+
+      {feedbackTarget && (
+        <JourneyFeedbackModal
+          student={feedbackTarget}
+          journeyNumber={feedbackStatusById[feedbackTarget.studentId]?.lastConcludedJourneyNumber}
+          onSend={handleSendJourneyFeedback}
+          onClose={() => setFeedbackTarget(null)}
+        />
+      )}
+
+      {toast && <div className="ag-toast" aria-live="polite">{toast}</div>}
     </div>
   )
 }

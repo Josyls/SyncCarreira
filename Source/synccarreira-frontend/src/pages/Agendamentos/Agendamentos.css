@@ -635,3 +635,28 @@ code {
   .ag-next { padding: 22px 18px 18px; }
   .ag-modal__head, .ag-modal__body, .ag-modal__foot { padding-left: 18px; padding-right: 18px; }
 }
+/* ── Feedback individual por aluno (RF-09) ─────────────────── */
+.ag-fb-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; }
+.ag-fb-item {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-md);
+  padding: 12px 14px;
+  background: var(--sc-white);
+}
+.ag-fb-item__head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; }
+.ag-fb-item__head .ag-card__ok { margin-left: auto; }
+.ag-fb-editor { display: flex; flex-direction: column; gap: 6px; }
+.ag-fb-editor__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ag-fb-sent__text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--sc-text);
+  white-space: pre-line;
+  background: #faf9fd;
+  border-radius: var(--sc-radius-sm);
+  padding: 10px 12px;
+}
+.ag-fb-sent__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--ag-cinza-texto); }
+.ag-fb-read { color: #2e7d32; font-weight: 600; }
+.ag-fb-unread { color: #8a5a00; font-weight: 600; }
+.ag-feedback__new { margin-left: auto; }
