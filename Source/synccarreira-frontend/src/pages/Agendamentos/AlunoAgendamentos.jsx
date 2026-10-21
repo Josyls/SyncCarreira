@@ -85,7 +85,11 @@ function NextSession({ appointment: a, email }) {
   )
 }
 
-export default function AlunoAgendamentos() {
+/**
+ * @param {Object}  props
+ * @param {boolean} [props.embedded] - true quando aparece dentro do perfil do aluno (usa h2 em vez de h1)
+ */
+export default function AlunoAgendamentos({ embedded = false }) {
   const { user } = useAuth()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading]           = useState(true)
@@ -132,7 +136,9 @@ export default function AlunoAgendamentos() {
     <>
       <div className="ag-page-head">
         <div>
-          <h1 className="ag-h1">Meus agendamentos</h1>
+          {embedded
+            ? <h2 className="sp-section-title">Agendamentos e feedbacks</h2>
+            : <h1 className="ag-h1">Meus agendamentos</h1>}
           <p className="ag-sub">Suas sessões com a orientadora e os feedbacks que ela enviou para você.</p>
         </div>
       </div>

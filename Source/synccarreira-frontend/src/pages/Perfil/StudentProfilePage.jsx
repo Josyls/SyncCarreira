@@ -1,63 +1,62 @@
+/**
+ * @file StudentProfilePage.jsx
+ * @description Perfil do aluno
+ */
+
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import AppHeader from '../../components/AppHeader/AppHeader.jsx'
-import { getMyStudentProfile, saveMyStudentAffinities } from '../../services/studentProfileService.js'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { getMyStudentProfile } from '../../services/studentProfileService.js'
+import { getMyCurrentJourneyStatus } from '../../services/journeyHistoryService.js'
+import InterestsForm from './components/InterestsForm.jsx'
+import DoubtSignal from './components/DoubtSignal.jsx'
+import JourneyHistory from './components/JourneyHistory.jsx'
+import AlunoAgendamentos from '../Agendamentos/AlunoAgendamentos.jsx'
+import '../Agendamentos/Agendamentos.css'
 import './StudentProfilePage.css'
 
-const AREAS = [
-  {
-    key: 'humanities',
-    title: 'Humanas',
-    prompt: 'Quanto você se interessa por sociedade, história, comunicação e cultura?',
-  },
-  {
-    key: 'exactSciences',
-    title: 'Exatas',
-    prompt: 'Quanto você se interessa por matemática, lógica, tecnologia e resolução de problemas?',
-  },
-  {
-    key: 'biologicalSciences',
-    title: 'Biológicas',
-    prompt: 'Quanto você se interessa por saúde, natureza e pelo funcionamento dos seres vivos?',
-  },
-  {
-    key: 'arts',
-    title: 'Artes',
-    prompt: 'Quanto você se interessa por criação, música, imagem, design e expressão artística?',
-  },
+const TABS = [
+  { id: 'interesses', label: 'Interesses' },
+  { id: 'jornadas', label: 'Minhas jornadas' },
+  { id: 'agendamentos', label: 'Agendamentos e feedbacks' },
 ]
 
-const EMPTY_AFFINITIES = {
-  humanities: null,
-  exactSciences: null,
-  biologicalSciences: null,
-  arts: null,
-}
-
-function errorMessage(error) {
-  if (error.response?.status === 422) {
-    return 'Revise suas respostas: cada área precisa receber uma nota de 0 a 5.'
-  }
-  if (!error.response) return 'Não foi possível conectar ao serviço. Confira se o backend está disponível e tente novamente.'
-  return 'Não foi possível salvar seu perfil agora. Tente novamente.'
+/** Primeiro acesso: só o formulário de interesses, como antes. */
+function OnboardingCard({ profile, onSaved }) {
+  return (
+    <section className="sp-card">
+      <span className="sp-eyebrow">PERSONALIZAÇÃO DA JORNADA</span>
+      <h1>Vamos personalizar sua jornada</h1>
+      <p className="sp-intro">
+        Suas respostas ajudam a contextualizar o resultado da jornada. Você pode voltar aqui e alterá-las sempre que quiser.
+      </p>
+      <InterestsForm profile={profile} onSaved={onSaved} />
+    </section>
+  )
 }
 
 export default function StudentProfilePage() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [profile, setProfile] = useState(null)
-  const [affinities, setAffinities] = useState(EMPTY_AFFINITIES)
+  const [journeyStatus, setJourneyStatus] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  const requestedTab = searchParams.get('aba')
+  const activeTab = TABS.some(tab => tab.id === requestedTab) ? requestedTab : 'interesses'
 
   useEffect(() => {
     let active = true
     getMyStudentProfile()
-      .then(data => {
+      .then(async data => {
         if (!active) return
         setProfile(data)
-        setAffinities({ ...EMPTY_AFFINITIES, ...data.affinities })
+        if (data.profileCompleted) {
+          const status = await getMyCurrentJourneyStatus().catch(() => null)
+          if (active) setJourneyStatus(status)
+        }
       })
       .catch(() => {
         if (active) setError('Não foi possível carregar seu perfil. Atualize a página ou tente novamente.')
@@ -69,38 +68,19 @@ export default function StudentProfilePage() {
     return () => { active = false }
   }, [])
 
-  const complete = AREAS.every(({ key }) => Number.isInteger(affinities[key])
-    && affinities[key] >= 0 && affinities[key] <= 5)
-
-  function selectAffinity(key, value) {
-    setAffinities(current => ({ ...current, [key]: value }))
-    setError('')
-    setSuccess('')
+  function openTab(tabId) {
+    setSearchParams(tabId === 'interesses' ? {} : { aba: tabId })
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    if (!complete || saving) return
-
-    setSaving(true)
-    setError('')
-    setSuccess('')
-    try {
-      const updated = await saveMyStudentAffinities(affinities)
-      setProfile(updated)
-      setAffinities({ ...EMPTY_AFFINITIES, ...updated.affinities })
-
-      if (!profile?.profileCompleted) {
-        navigate('/home', { replace: true, state: { profilePersonalized: true } })
-        return
-      }
-      setSuccess('Seus interesses foram atualizados. Você pode alterá-los novamente quando quiser.')
-    } catch (saveError) {
-      setError(errorMessage(saveError))
-    } finally {
-      setSaving(false)
-    }
+  function handleTabKeyDown(event, index) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+    const step = event.key === 'ArrowRight' ? 1 : -1
+    const next = TABS[(index + step + TABS.length) % TABS.length]
+    openTab(next.id)
+    document.getElementById(`sp-tab-${next.id}`)?.focus()
   }
+
+  const firstName = (user?.nome ?? profile?.name ?? '').split(' ')[0]
 
   return (
     <div className="sp-page">
@@ -108,57 +88,71 @@ export default function StudentProfilePage() {
       <main className="sp-main">
         <Link className="sp-back" to="/home">← Voltar para o início</Link>
 
-        <section className="sp-card">
-          <span className="sp-eyebrow">PERSONALIZAÇÃO DA JORNADA</span>
-          <h1>{profile?.profileCompleted ? 'Seus interesses' : 'Vamos personalizar sua jornada'}</h1>
-          <p className="sp-intro">
-            Suas respostas ajudam a contextualizar o resultado da jornada. Você pode voltar aqui e alterá-las sempre que quiser.
-          </p>
+        {loading && <section className="sp-card"><div className="sp-state" role="status">Carregando seu perfil…</div></section>}
+        {!loading && error && <section className="sp-card"><p className="sp-message sp-message--error" role="alert">{error}</p></section>}
 
-          {loading ? (
-            <div className="sp-state" role="status">Carregando seu perfil…</div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <fieldset className="sp-scale-legend" disabled>
-                <legend>Escolha uma nota para cada área</legend>
-                <div className="sp-scale-ends"><span>0 · Não me interessa</span><span>5 · Tenho muito interesse</span></div>
-              </fieldset>
+        {!loading && !error && profile && !profile.profileCompleted && (
+          <OnboardingCard profile={profile} onSaved={setProfile} />
+        )}
 
-              <div className="sp-areas">
-                {AREAS.map(({ key, title, prompt }, index) => (
-                  <fieldset className="sp-area" key={key}>
-                    <legend><span>{String(index + 1).padStart(2, '0')}</span>{title}</legend>
-                    <p>{prompt}</p>
-                    <div className="sp-rating" role="group" aria-label={`Interesse em ${title}`}>
-                      {[0, 1, 2, 3, 4, 5].map(value => (
-                        <button
-                          className={affinities[key] === value ? 'is-selected' : ''}
-                          key={value}
-                          type="button"
-                          aria-pressed={affinities[key] === value}
-                          aria-label={`${value} de 5`}
-                          onClick={() => selectAffinity(key, value)}
-                        >
-                          {value}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
-                ))}
-              </div>
+        {!loading && !error && profile?.profileCompleted && (
+          <>
+            <header className="sp-profile-head">
+              <span className="sp-eyebrow">MEU PERFIL</span>
+              <h1>{firstName ? `Olá, ${firstName}` : 'Meu perfil'}</h1>
+              <p className="sp-intro">Seus interesses, suas jornadas e as conversas com a sua orientadora em um só lugar.</p>
+            </header>
 
-              {error && <p className="sp-message sp-message--error" role="alert">{error}</p>}
-              {success && <p className="sp-message sp-message--success" role="status">{success}</p>}
+            {/* key: ao iniciar uma nova jornada, o card recarrega a situação da dúvida */}
+            <DoubtSignal
+              key={journeyStatus?.currentJourneyNumber ?? 'sem-jornada'}
+              journeyConcluded={Boolean(journeyStatus?.currentJourneyConcluded)}
+              onOpenSchedule={() => openTab('agendamentos')}
+            />
 
-              <div className="sp-form-footer">
-                <p>Essas respostas não definem sua carreira. Elas são apenas um ponto de partida e podem mudar com o tempo.</p>
-                <button className="sp-submit" type="submit" disabled={!complete || saving}>
-                  {saving ? 'Salvando…' : profile?.profileCompleted ? 'Salvar alterações' : 'Salvar e começar a jornada'}
+            <div className="sp-tabs" role="tablist" aria-label="Seções do perfil">
+              {TABS.map((tab, index) => (
+                <button
+                  key={tab.id}
+                  id={`sp-tab-${tab.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`sp-panel-${tab.id}`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  className={`sp-tab${activeTab === tab.id ? ' is-active' : ''}`}
+                  onClick={() => openTab(tab.id)}
+                  onKeyDown={event => handleTabKeyDown(event, index)}
+                >
+                  {tab.label}
                 </button>
-              </div>
-            </form>
-          )}
-        </section>
+              ))}
+            </div>
+
+            <section
+              className="sp-card sp-tab-panel"
+              id={`sp-panel-${activeTab}`}
+              role="tabpanel"
+              aria-labelledby={`sp-tab-${activeTab}`}
+            >
+              {activeTab === 'interesses' && (
+                <>
+                  <h2 className="sp-section-title">Seus interesses</h2>
+                  <p className="sp-intro">Suas respostas ajudam a contextualizar o resultado da jornada. Você pode alterá-las sempre que quiser.</p>
+                  <InterestsForm profile={profile} onSaved={setProfile} />
+                </>
+              )}
+              {activeTab === 'jornadas' && (
+                <JourneyHistory status={journeyStatus} onStatusChange={setJourneyStatus} />
+              )}
+              {activeTab === 'agendamentos' && (
+                <div className="sp-embedded-schedule">
+                  <AlunoAgendamentos embedded />
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
     </div>
   )
