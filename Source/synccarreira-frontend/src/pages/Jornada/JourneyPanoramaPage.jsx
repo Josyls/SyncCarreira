@@ -48,12 +48,19 @@ function isTrailComplete(trail) {
   return trail.totalQuestions > 0 && trail.answers.length >= trail.totalQuestions
 }
 
+/** Estado visual da etapa: concluída, em andamento, aguardando início ou bloqueada. */
+function trailState(trail, { complete, answered, hasActivity }) {
+  if (complete) return { state: 'complete', status: 'Concluída' }
+  if (trail.locked) return { state: 'waiting', status: 'Bloqueada' }
+  if (hasActivity) return { state: 'progress', status: answered ? 'Em andamento' : 'Ainda não iniciada' }
+  return { state: 'waiting', status: 'Ainda não iniciada' }
+}
+
 function TrailMemory({ trail, index, isLast }) {
   const answered = trail.answers.length > 0
   const hasActivity = answered || Boolean(trail.synthesis)
   const complete = isTrailComplete(trail)
-  const state = complete ? 'complete' : hasActivity ? 'progress' : 'waiting'
-  const status = complete ? 'Concluída' : answered ? 'Em andamento' : 'Ainda não iniciada'
+  const { state, status } = trailState(trail, { complete, answered, hasActivity })
 
   return (
     <article className={`jp-step jp-step--${state}${isLast ? ' jp-step--last' : ''}`}>
@@ -69,9 +76,11 @@ function TrailMemory({ trail, index, isLast }) {
           <span className={`jp-status jp-status--${state}`}>{status}</span>
         </header>
 
-        <p className="jp-step__caption">
-          {trail.answers.length} de {trail.totalQuestions} perguntas com resposta
-        </p>
+        {!trail.locked && (
+          <p className="jp-step__caption">
+            {trail.answers.length} de {trail.totalQuestions} perguntas com resposta
+          </p>
+        )}
 
         {answered && (
           <div className="jp-memories">
@@ -94,7 +103,10 @@ function TrailMemory({ trail, index, isLast }) {
           </div>
         )}
 
-        {!hasActivity && (
+        {trail.locked && (
+          <p className="jp-step__empty">Esta etapa será liberada quando você concluir a etapa anterior.</p>
+        )}
+        {!hasActivity && !trail.locked && (
           <p className="jp-step__empty">Esta etapa ainda não faz parte do caminho percorrido nesta jornada.</p>
         )}
       </div>
@@ -143,6 +155,17 @@ function PastJourney({ journey }) {
   )
 }
 
+/** Mensagem com o endpoint e o motivo da falha, para facilitar o diagnóstico (ex.: "GET /journeys/me/current → 500: ..."). */
+function describeLoadError(error) {
+  const base = 'Não foi possível montar o panorama da sua jornada agora.'
+  if (!error.response) return `${base} Verifique se o backend está rodando.`
+  const { status, data } = error.response
+  const detail = data?.error || data?.message
+  let info = error.config?.url ? `GET ${error.config.url} → ${status}` : String(status)
+  if (detail) info += `: ${detail}`
+  return `${base} (${info})`
+}
+
 export default function JourneyPanoramaPage() {
   const { user } = useAuth()
   const [currentJourney, setCurrentJourney] = useState(null)
@@ -166,10 +189,16 @@ export default function JourneyPanoramaPage() {
         ])
         const orderedTrails = [...(trailsData ?? [])].sort((a, b) => (a.sequentialOrder ?? 0) - (b.sequentialOrder ?? 0))
         const detailedTrails = await Promise.all(orderedTrails.map(async trail => {
-          const [questions, answers] = await Promise.all([
-            getQuestionsByTrail(trail.id),
-            getAnswers(user?.id, trail.id),
-          ])
+          // Trilha ainda não liberada: o backend recusa as perguntas (422). Ela aparece como bloqueada
+          // em vez de derrubar o panorama inteiro.
+          const questions = await getQuestionsByTrail(trail.id).catch(questionsError => {
+            if (questionsError.response?.status === 422) return null
+            throw questionsError
+          })
+          if (questions === null) {
+            return { ...trail, locked: true, totalQuestions: 0, answers: [], synthesis: null }
+          }
+          const answers = await getAnswers(user?.id, trail.id)
           const synthesis = syntheses.find(item => Number(item.trailId ?? item.trail?.id) === Number(trail.id))
           return {
             ...trail,
@@ -188,7 +217,8 @@ export default function JourneyPanoramaPage() {
           }
         }
       } catch (loadError) {
-        if (active) setError(loadError.response?.data?.message || 'Não foi possível montar o panorama da sua jornada agora.')
+        console.error('[MinhaJornada] Falha ao carregar:', loadError.config?.url, loadError.response?.status, loadError.response?.data ?? loadError.message)
+        if (active) setError(describeLoadError(loadError))
       } finally {
         if (active) setLoading(false)
       }
