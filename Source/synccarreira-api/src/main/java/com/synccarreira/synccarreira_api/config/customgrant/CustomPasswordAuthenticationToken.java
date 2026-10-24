@@ -23,8 +23,13 @@ public class CustomPasswordAuthenticationToken extends OAuth2AuthorizationGrantA
 		
 		super(new AuthorizationGrantType("password"), clientPrincipal, additionalParameters);
 		
-		this.username = (String) additionalParameters.get("username");
-		this.password = (String) additionalParameters.get("password");
+		if (additionalParameters != null) {
+			this.username = (String) additionalParameters.get("username");
+			this.password = (String) additionalParameters.get("password");
+		} else {
+			this.username = null;
+			this.password = null;
+		}
 		this.scopes = Collections.unmodifiableSet(
 				scopes != null ? new HashSet<>(scopes) : Collections.emptySet());
 	}
